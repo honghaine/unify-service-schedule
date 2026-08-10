@@ -1,0 +1,168 @@
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --card-bg: #f7f7f8;
+  --border: #dddde3;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+  --success-bg: #ecfdf3;
+  --success-border: #34d399;
+  --error-bg: #fef2f2;
+  --error-border: #f87171;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --card-bg: #161618;
+    --border: #2a2a2e;
+    --accent: #3b82f6;
+    --accent-foreground: #0a0a0a;
+    --success-bg: #052e1c;
+    --success-border: #22c55e;
+    --error-bg: #2c1212;
+    --error-border: #ef4444;
+  }
+}
+
+html {
+  height: 100%;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+}
+
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+.page h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  color: color-mix(in srgb, var(--foreground) 70%, transparent);
+  max-width: 60ch;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.card h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.25rem;
+}
+
+.card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.card .row {
+  display: flex;
+  gap: 0.9rem;
+}
+
+.card .row label {
+  flex: 1;
+}
+
+.card input,
+.card select {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.95rem;
+}
+
+.card button {
+  margin-top: 0.25rem;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.result {
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.result.success {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+}
+
+.result.error {
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+}

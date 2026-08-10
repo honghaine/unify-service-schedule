@@ -5,8 +5,10 @@ challenge this project solves: two customers requesting the same technician
 or service bay at the same time must never both get confirmed — one gets a
 `201`, the other gets a `409`, even under concurrent load.
 
-Frontend is out of scope; the API is exercised via cURL examples below and a
-suite of automated tests.
+The backend is the graded deliverable; the API is exercised via cURL
+examples below and a suite of automated tests. A minimal Next.js demo UI
+also lives in [`frontend/`](frontend/) for visually exercising the booking
+flow — see [`frontend/README.md`](frontend/README.md).
 
 ## Tech Stack
 
