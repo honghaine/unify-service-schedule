@@ -20,13 +20,13 @@ flowchart LR
     IdemLock --> Redis
     CandCache --> Redis
     App -->|/actuator/prometheus| Prometheus --> Grafana
-    App -->|docker logging driver: loki| Loki --> Grafana
+    App -->|stdout, Docker socket| Promtail --> Loki --> Grafana
 ```
 
-Three new Docker Compose services: `redis`, `prometheus`, `grafana`
-(Loki runs as a fourth, or the Loki Docker driver ships directly to a
-managed/local Loki — see §5). No changes to the existing `app`/`mysql`
-services' core behavior.
+Five new Docker Compose services: `redis`, `prometheus`, `grafana`, `loki`,
+`promtail` (see §5 for why Promtail rather than Docker's native Loki
+logging driver). No changes to the existing `app`/`mysql` services' core
+behavior.
 
 ## 2. Components
 
@@ -46,10 +46,14 @@ services' core behavior.
   No application code changes; the Micrometer counters
   (`booking.attempts.total`, `booking.conflicts.total`) and default JVM/HTTP
   metrics are already exposed.
-- **Loki** — ingests the app container's stdout via Docker Compose's native
-  `loki` logging driver. No Promtail sidecar needed because logs are already
-  structured JSON (ECS format, `logging.structured.format.console=ecs`),
-  so no additional parsing agent is required.
+- **Loki + Promtail** — Promtail tails the `app` container's stdout via the
+  Docker socket and ships it to Loki. Docker's native `loki` logging driver
+  was considered instead (one fewer container) but rejected: it requires
+  `docker plugin install grafana/loki-docker-driver` on the host, which
+  breaks this project's zero-manual-step guarantee (`docker compose up
+  --build` is enough for a reviewer, no host configuration). Promtail's own
+  config stays trivial because logs are already structured JSON (ECS
+  format) — no parsing regex needed, just ship lines as-is.
 - **Grafana** — one dashboard, two datasources (Prometheus + Loki), so
   metrics and logs for the same request/correlation id are visible in one
   place.
@@ -92,7 +96,7 @@ Redis is additive, never load-bearing for correctness:
 | Redisson (not plain Jedis/Lettuce + manual `SETNX`) | `RLock` provides lease/watchdog semantics out of the box instead of hand-rolling TTL-based mutual exclusion and its edge cases (clock skew, missed unlock). |
 | Spring Cache abstraction (`@Cacheable`) over raw `RedisTemplate` | Keeps caching declarative and out of `BookingService`'s business logic, consistent with the codebase's existing "thin, single-purpose components" pattern (`docs/design.md` §2). |
 | Prometheus + Grafana + Loki over an ELK-style stack | Lower resource footprint for a demo/assessment project; requires no application code changes since Micrometer metrics and structured JSON logs already exist for exactly this purpose. |
-| Docker's native Loki logging driver over a Promtail sidecar | One fewer container; justified specifically because logs are already structured JSON — a log-shipping agent's usual job (parsing unstructured text) isn't needed here. |
+| Promtail sidecar over Docker's native Loki logging driver | The driver needs a one-time `docker plugin install` on the host, which a `docker compose up --build`-only reviewer workflow can't do; Promtail is one extra container but needs zero host setup. |
 
 ## 6. Testing
 
