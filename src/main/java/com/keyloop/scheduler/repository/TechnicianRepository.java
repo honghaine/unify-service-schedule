@@ -1,7 +1,9 @@
 package com.keyloop.scheduler.repository;
 
+import com.keyloop.scheduler.config.CacheConfig;
 import com.keyloop.scheduler.domain.Technician;
 import jakarta.persistence.LockModeType;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +14,7 @@ import java.util.Optional;
 
 public interface TechnicianRepository extends JpaRepository<Technician, Long> {
 
+    @Cacheable(CacheConfig.TECHNICIAN_CANDIDATES_CACHE)
     List<Technician> findBySpecialtyAndDealershipIdOrderById(String specialty, Long dealershipId);
 
     /**
