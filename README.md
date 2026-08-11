@@ -79,6 +79,34 @@ container via Testcontainers (no H2/mocking of the database). 19 tests across
 Vehicles: id=1 (Honda Accord, customer 1), id=2 (Ford F-150, customer 2),
 id=3 (BMW 3 Series, customer 3).
 
+## Redis + Observability Stack
+
+`docker compose up --build` also starts Redis (idempotency lock + candidate
+cache), Prometheus, Grafana, Loki, and Promtail. None of these are required
+for the core booking guarantee — MySQL row locking is (see [System Design
+Document](docs/design.md) §3) — they're additive.
+
+| Service | URL | Notes |
+|---|---|---|
+| Redis | `localhost:6379` | idempotency lock + candidate-list cache |
+| Prometheus | http://localhost:9090 | scrapes `/actuator/prometheus` |
+| Grafana | http://localhost:3001 | anonymous admin access enabled for local demo; dashboard: "Unified Service Scheduler" |
+| Loki | http://localhost:3100 | log storage, queried via Grafana |
+
+### Idempotency-Key (optional)
+
+`POST /appointments` accepts an optional `Idempotency-Key` header. A second
+concurrent request with the same key gets an immediate `409` before it ever
+reaches the booking logic — useful for retry-safe clients (e.g. a double
+form submit). Omitting the header is unchanged from before this feature.
+
+```bash
+curl -X POST http://localhost:8080/appointments \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: my-retry-key-123" \
+  -d '{"vehicleId":1,"serviceType":"OIL_CHANGE","dealershipId":1,"desiredStart":"2026-09-01T09:00:00","desiredEnd":"2026-09-01T10:00:00"}'
+```
+
 ## API
 
 ### `POST /appointments`

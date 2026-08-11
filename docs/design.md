@@ -194,3 +194,17 @@ phase (writing all the actual Java code and tests) is covered separately in
 the [README's AI Collaboration Narrative](../README.md#ai-collaboration-narrative),
 including two real bugs the AI-written code shipped with that only
 concurrent-load and dedicated-endpoint testing caught.
+
+## 7. Addendum: Redis Layer + Observability Stack
+
+Added after the initial submission: an optional Redis layer (idempotency
+lock on `POST /appointments`, 10-minute-TTL cache on the read-only
+technician/service-bay candidate lists) and a Prometheus/Grafana/Loki
+observability stack. Full design rationale, including why these are
+explicitly additive and fail-open with respect to the booking-correctness
+guarantee in §3, is in
+[`docs/superpowers/specs/2026-08-11-redis-observability-design.md`](superpowers/specs/2026-08-11-redis-observability-design.md).
+The one-sentence version: MySQL row locking is still the only thing that
+has ever prevented double-booking — Redis being down never changes a
+booking outcome, only whether a duplicate submit gets deduped early and
+whether a candidate-list read hits cache or DB.
