@@ -2,12 +2,14 @@ package com.keyloop.scheduler.service;
 
 import com.keyloop.scheduler.domain.Appointment;
 import com.keyloop.scheduler.domain.AppointmentStatus;
+import com.keyloop.scheduler.domain.Customer;
 import com.keyloop.scheduler.domain.ServiceBay;
 import com.keyloop.scheduler.domain.Technician;
 import com.keyloop.scheduler.domain.Vehicle;
 import com.keyloop.scheduler.exception.BookingConflictException;
 import com.keyloop.scheduler.exception.ResourceNotFoundException;
 import com.keyloop.scheduler.repository.AppointmentRepository;
+import com.keyloop.scheduler.repository.CustomerRepository;
 import com.keyloop.scheduler.repository.ServiceBayRepository;
 import com.keyloop.scheduler.repository.TechnicianRepository;
 import com.keyloop.scheduler.repository.VehicleRepository;
@@ -38,6 +40,7 @@ public class BookingService {
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     private final VehicleRepository vehicleRepository;
+    private final CustomerRepository customerRepository;
     private final TechnicianRepository technicianRepository;
     private final ServiceBayRepository serviceBayRepository;
     private final AppointmentRepository appointmentRepository;
@@ -45,11 +48,13 @@ public class BookingService {
 
     public BookingService(
             VehicleRepository vehicleRepository,
+            CustomerRepository customerRepository,
             TechnicianRepository technicianRepository,
             ServiceBayRepository serviceBayRepository,
             AppointmentRepository appointmentRepository,
             BookingMetrics metrics) {
         this.vehicleRepository = vehicleRepository;
+        this.customerRepository = customerRepository;
         this.technicianRepository = technicianRepository;
         this.serviceBayRepository = serviceBayRepository;
         this.appointmentRepository = appointmentRepository;
@@ -72,16 +77,18 @@ public class BookingService {
     public Appointment bookAppointment(BookAppointmentCommand command) {
         metrics.recordAttempt();
 
-        Vehicle vehicle = vehicleRepository.findById(command.vehicleId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Vehicle %d not found".formatted(command.vehicleId())));
+        Vehicle vehicle = resolveVehicle(command);
 
-        Technician technician = findAvailableTechnician(command);
+        Technician technician = command.technicianId() != null
+                ? findRequestedTechnician(command)
+                : findAvailableTechnician(command);
         if (technician == null) {
             metrics.recordConflict();
             throw new BookingConflictException(
-                    "No qualified technician available for serviceType=%s dealershipId=%d in the requested window"
-                            .formatted(command.serviceType(), command.dealershipId()));
+                    command.technicianId() != null
+                            ? "Requested technician %d is not available for the requested window".formatted(command.technicianId())
+                            : "No qualified technician available for serviceType=%s dealershipId=%d in the requested window"
+                                    .formatted(command.serviceType(), command.dealershipId()));
         }
 
         ServiceBay serviceBay = findAvailableServiceBay(command);
@@ -107,6 +114,52 @@ public class BookingService {
                 "appointment.confirmed id={} technicianId={} serviceBayId={} vehicleId={}",
                 saved.getId(), technician.getId(), serviceBay.getId(), vehicle.getId());
         return saved;
+    }
+
+    /**
+     * Existing vehicleId is used as-is. Otherwise this is a guest booking:
+     * find-or-create the Customer by email, then find-or-create the Vehicle
+     * by VIN under that customer. Known gap: two concurrent guest bookings
+     * with the same brand-new VIN can both miss the findByVin lookup and
+     * race on the vin unique constraint at insert time - acceptable for
+     * this scenario's scope (not the double-booking guarantee this system
+     * exists to protect), but a real production system would need a
+     * find-or-create retry/upsert here.
+     */
+    private Vehicle resolveVehicle(BookAppointmentCommand command) {
+        if (command.vehicleId() != null) {
+            return vehicleRepository.findById(command.vehicleId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Vehicle %d not found".formatted(command.vehicleId())));
+        }
+
+        Customer customer = customerRepository.findByEmail(command.customerEmail())
+                .orElseGet(() -> customerRepository.save(
+                        new Customer(command.customerName(), command.customerEmail(), command.customerPhone())));
+
+        return vehicleRepository.findByVin(command.vehicleVin())
+                .orElseGet(() -> vehicleRepository.save(
+                        new Vehicle(command.vehicleVin(), command.vehicleMake(), command.vehicleModel(), customer)));
+    }
+
+    /**
+     * Explicit technician choice: lock + check availability for exactly
+     * that technician (no specialty/qualification re-check here - the
+     * caller chose them, matching TechnicianController's listing of
+     * qualified technicians). Returns null on conflict, same as
+     * findAvailableTechnician, so the caller's conflict handling is shared.
+     */
+    private Technician findRequestedTechnician(BookAppointmentCommand command) {
+        Technician locked = technicianRepository.lockById(command.technicianId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Technician %d not found".formatted(command.technicianId())));
+        if (!locked.getDealershipId().equals(command.dealershipId())) {
+            throw new ResourceNotFoundException(
+                    "Technician %d is not at dealership %d".formatted(command.technicianId(), command.dealershipId()));
+        }
+        boolean overlap = appointmentRepository.existsOverlappingForTechnician(
+                locked.getId(), command.desiredStart(), command.desiredEnd(), AppointmentStatus.CONFIRMED);
+        return overlap ? null : locked;
     }
 
     private Technician findAvailableTechnician(BookAppointmentCommand command) {

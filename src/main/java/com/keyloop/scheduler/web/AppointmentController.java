@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,13 +37,12 @@ public class AppointmentController {
     }
 
     @PostMapping
-    public ResponseEntity<AppointmentResponse> create(
-            @Valid @RequestBody CreateAppointmentRequest request,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+    public ResponseEntity<AppointmentResponse> create(@Valid @RequestBody CreateAppointmentRequest request) {
+        String idempotencyKey = deriveIdempotencyKey(request);
         IdempotencyLockService.LockAttempt lockAttempt = idempotencyLockService.tryAcquire(idempotencyKey);
         if (lockAttempt.outcome() == IdempotencyLockService.Outcome.REJECTED) {
             throw new BookingConflictException(
-                    "Duplicate request in flight for Idempotency-Key=%s".formatted(idempotencyKey));
+                    "Duplicate request in flight for the same slot/technician/customer combination");
         }
         try {
             Appointment appointment = bookingService.bookAppointment(new BookAppointmentCommand(
@@ -52,11 +50,38 @@ public class AppointmentController {
                     request.serviceType(),
                     request.dealershipId(),
                     request.desiredStart(),
-                    request.desiredEnd()));
+                    request.desiredEnd(),
+                    request.technicianId(),
+                    request.customerName(),
+                    request.customerEmail(),
+                    request.customerPhone(),
+                    request.vehicleVin(),
+                    request.vehicleMake(),
+                    request.vehicleModel()));
             return ResponseEntity.status(HttpStatus.CREATED).body(AppointmentResponse.from(appointment));
         } finally {
             idempotencyLockService.release(lockAttempt);
         }
+    }
+
+    /**
+     * Natural-key dedupe, not a client-supplied token: desiredStart +
+     * desiredEnd + dealershipId + serviceType + technician-or-"any" +
+     * customer identity (email, or vehicleId when booking against an
+     * existing vehicle without a guest email). This only dedupes exact
+     * duplicate submissions (e.g. a double-click) against the same
+     * customer - it deliberately never mixes two different customers'
+     * requests together, and never blocks two genuinely different time
+     * windows even if submitted by the same customer at once.
+     */
+    private String deriveIdempotencyKey(CreateAppointmentRequest request) {
+        String technicianPart = request.technicianId() != null ? request.technicianId().toString() : "any";
+        String customerPart = request.customerEmail() != null && !request.customerEmail().isBlank()
+                ? request.customerEmail().trim().toLowerCase()
+                : "vehicle:" + request.vehicleId();
+        return "%s|%s|%d|%s|%s|%s".formatted(
+                request.desiredStart(), request.desiredEnd(), request.dealershipId(),
+                request.serviceType(), technicianPart, customerPart);
     }
 
     @GetMapping("/{id}")

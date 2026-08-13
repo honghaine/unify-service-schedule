@@ -54,7 +54,8 @@ class BookingServiceConcurrencyTest {
                 allThreadsReady.countDown();
                 try {
                     startSignal.await();
-                    bookingService.bookAppointment(new BookAppointmentCommand(1L, "OIL_CHANGE", 1L, start, end));
+                    bookingService.bookAppointment(new BookAppointmentCommand(
+                            1L, "OIL_CHANGE", 1L, start, end, null, null, null, null, null, null, null));
                     successCount.incrementAndGet();
                 } catch (BookingConflictException expected) {
                     conflictCount.incrementAndGet();

@@ -47,7 +47,7 @@ class AppointmentRepositoryOverlapTest {
         // dealershipId=999 / bayNumber="TEST-BAY" deliberately fall outside the
         // Flyway seed data (V2__seed_data.sql) range so this test's fixtures
         // never collide with the unique constraint on (dealership_id, bay_number).
-        Customer customer = entityManager.persist(new Customer("Test Customer", "test@example.com"));
+        Customer customer = entityManager.persist(new Customer("Test Customer", "test@example.com", "555-0100"));
         Vehicle vehicle = entityManager.persist(new Vehicle("1HGCM82633A000001", "Honda", "Civic", customer));
         technician = entityManager.persist(new Technician("Test Tech", "OIL_CHANGE", 999L));
         serviceBay = entityManager.persist(new ServiceBay(999L, "TEST-BAY"));

@@ -2,6 +2,7 @@ package com.keyloop.scheduler.web;
 
 import com.keyloop.scheduler.domain.Appointment;
 import com.keyloop.scheduler.domain.AppointmentStatus;
+import com.keyloop.scheduler.domain.Technician;
 import com.keyloop.scheduler.exception.ResourceNotFoundException;
 import com.keyloop.scheduler.repository.AppointmentRepository;
 import com.keyloop.scheduler.repository.TechnicianRepository;
@@ -36,13 +37,33 @@ public class TechnicianController {
             throw new ResourceNotFoundException("Technician %d not found".formatted(id));
         }
 
-        List<Appointment> dayAppointments = appointmentRepository.findOverlappingForTechnician(
-                id, date.atStartOfDay(), date.plusDays(1).atStartOfDay(), AppointmentStatus.CONFIRMED);
+        return new AvailabilityResponse(id, date, busyWindowsFor(id, date));
+    }
 
-        List<AvailabilityResponse.BusyWindow> busyWindows = dayAppointments.stream()
+    /**
+     * Aggregate view for a calendar/slot-picker UI: every technician
+     * qualified for serviceType at dealershipId, with their busy windows
+     * for the day, so the caller can compute open slots without knowing
+     * technician ids in advance (they may also leave technicianId blank on
+     * POST /appointments and let the backend auto-assign).
+     */
+    @GetMapping("/availability")
+    public List<AvailabilityResponse.TechnicianAvailability> availabilityForService(
+            @RequestParam Long dealershipId,
+            @RequestParam String serviceType,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<Technician> qualified = technicianRepository.findBySpecialtyAndDealershipIdOrderById(serviceType, dealershipId);
+        return qualified.stream()
+                .map(t -> new AvailabilityResponse.TechnicianAvailability(
+                        t.getId(), t.getName(), date, busyWindowsFor(t.getId(), date)))
+                .toList();
+    }
+
+    private List<AvailabilityResponse.BusyWindow> busyWindowsFor(Long technicianId, LocalDate date) {
+        List<Appointment> dayAppointments = appointmentRepository.findOverlappingForTechnician(
+                technicianId, date.atStartOfDay(), date.plusDays(1).atStartOfDay(), AppointmentStatus.CONFIRMED);
+        return dayAppointments.stream()
                 .map(a -> new AvailabilityResponse.BusyWindow(a.getStartTime(), a.getEndTime()))
                 .toList();
-
-        return new AvailabilityResponse(id, date, busyWindows);
     }
 }

@@ -23,13 +23,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * The Idempotency-Key lock is a UX/dedup layer in front of BookingService,
- * not a replacement for the MySQL-level correctness guarantee (see
- * BookingServiceConcurrencyTest for that one). Deliberately uses five
- * *non-overlapping* time windows for the same technician — MySQL's overlap
- * lock would happily confirm all five on its own, so if this test observes
- * only one 201, that can only be explained by the shared Idempotency-Key
- * rejecting the other four before they ever reach BookingService.
+ * The idempotency lock is a UX/dedup layer in front of BookingService, not
+ * a replacement for the MySQL-level correctness guarantee (see
+ * BookingServiceConcurrencyTest for that one). Since AppointmentController
+ * now derives the lock key from request fields (time/dealership/service/
+ * technician/customer) rather than a client-supplied header, "same
+ * request" is what makes two submissions collide - these tests fire
+ * *identical* bodies concurrently rather than varying a header.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -42,11 +42,13 @@ class IdempotencyLockControllerTest {
     private MockMvc mockMvc;
 
     @Test
-    void concurrentSubmitsWithSameIdempotencyKey_onlyOneReaches201() throws Exception {
-        LocalDateTime baseHour = LocalDateTime.now().plusDays(10).withHour(8).withMinute(0).withSecond(0).withNano(0);
-        String idempotencyKey = "test-key-" + System.nanoTime();
-        int attempts = 5;
+    void concurrentIdenticalGuestSubmits_onlyOneReaches201() throws Exception {
+        LocalDateTime start = LocalDateTime.now().plusDays(12).withHour(9).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime end = start.plusHours(1);
+        String email = "dup-test-" + System.nanoTime() + "@example.com";
+        String requestJson = guestRequestJson(email, start, end);
 
+        int attempts = 5;
         ExecutorService executor = Executors.newFixedThreadPool(attempts);
         CountDownLatch startSignal = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(attempts);
@@ -55,15 +57,11 @@ class IdempotencyLockControllerTest {
         List<Throwable> unexpected = new CopyOnWriteArrayList<>();
 
         for (int i = 0; i < attempts; i++) {
-            LocalDateTime start = baseHour.plusHours(i);
-            LocalDateTime end = start.plusHours(1);
-            String requestJson = createRequestJson(1L, "OIL_CHANGE", 1L, start, end);
             executor.submit(() -> {
                 try {
                     startSignal.await();
                     int responseStatus = mockMvc.perform(post("/appointments")
                                     .contentType("application/json")
-                                    .header("Idempotency-Key", idempotencyKey)
                                     .content(requestJson))
                             .andReturn().getResponse().getStatus();
                     if (responseStatus == 201) {
@@ -92,19 +90,43 @@ class IdempotencyLockControllerTest {
     }
 
     @Test
-    void submitWithoutIdempotencyKey_behavesAsBefore() throws Exception {
-        LocalDateTime start = LocalDateTime.now().plusDays(11).withHour(9).withMinute(0).withSecond(0).withNano(0);
+    void differentCustomers_sameSlotAndTechnician_bothReachBookingService() throws Exception {
+        // Different emails -> different idempotency keys -> neither is
+        // rejected by the lock itself. They still can't both win (only one
+        // technician/bay), but that's MySQL's overlap lock doing its job,
+        // not this one - proves the key is scoped per-customer rather than
+        // blocking unrelated customers from each other.
+        LocalDateTime start = LocalDateTime.now().plusDays(13).withHour(9).withMinute(0).withSecond(0).withNano(0);
+        LocalDateTime end = start.plusHours(1);
+        String requestA = guestRequestJson("customer-a-" + System.nanoTime() + "@example.com", start, end);
+        String requestB = guestRequestJson("customer-b-" + System.nanoTime() + "@example.com", start, end);
+
+        int statusA = mockMvc.perform(post("/appointments").contentType("application/json").content(requestA))
+                .andReturn().getResponse().getStatus();
+        int statusB = mockMvc.perform(post("/appointments").contentType("application/json").content(requestB))
+                .andReturn().getResponse().getStatus();
+
+        assertThat(List.of(statusA, statusB)).containsExactlyInAnyOrder(201, 409);
+    }
+
+    @Test
+    void submitWithExistingVehicleId_stillWorks() throws Exception {
+        LocalDateTime start = LocalDateTime.now().plusDays(14).withHour(9).withMinute(0).withSecond(0).withNano(0);
         LocalDateTime end = start.plusHours(1);
 
         mockMvc.perform(post("/appointments")
                         .contentType("application/json")
-                        .content(createRequestJson(3L, "OIL_CHANGE", 2L, start, end)))
+                        .content("""
+                                {"vehicleId":2,"serviceType":"BRAKES","dealershipId":1,"desiredStart":"%s","desiredEnd":"%s"}
+                                """.formatted(ISO.format(start), ISO.format(end))))
                 .andExpect(status().isCreated());
     }
 
-    private String createRequestJson(Long vehicleId, String serviceType, Long dealershipId, LocalDateTime start, LocalDateTime end) {
+    private String guestRequestJson(String email, LocalDateTime start, LocalDateTime end) {
         return """
-                {"vehicleId":%d,"serviceType":"%s","dealershipId":%d,"desiredStart":"%s","desiredEnd":"%s"}
-                """.formatted(vehicleId, serviceType, dealershipId, ISO.format(start), ISO.format(end));
+                {"serviceType":"OIL_CHANGE","dealershipId":1,"desiredStart":"%s","desiredEnd":"%s",
+                 "customerName":"Dup Test","customerEmail":"%s","customerPhone":"555-0100",
+                 "vehicleVin":"VIN-%s","vehicleMake":"Toyota","vehicleModel":"Corolla"}
+                """.formatted(ISO.format(start), ISO.format(end), email, email.hashCode());
     }
 }

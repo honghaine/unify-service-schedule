@@ -18,12 +18,15 @@ public class Customer {
 
     private String email;
 
+    private String phone;
+
     protected Customer() {
     }
 
-    public Customer(String name, String email) {
+    public Customer(String name, String email, String phone) {
         this.name = name;
         this.email = email;
+        this.phone = phone;
     }
 
     public Long getId() {
@@ -36,5 +39,9 @@ public class Customer {
 
     public String getEmail() {
         return email;
+    }
+
+    public String getPhone() {
+        return phone;
     }
 }
