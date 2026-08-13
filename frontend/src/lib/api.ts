@@ -26,11 +26,30 @@ export type ErrorResponse = {
 };
 
 export type CreateAppointmentRequest = {
-  vehicleId: number;
+  vehicleId?: number;
   serviceType: string;
   dealershipId: number;
   desiredStart: string;
   desiredEnd: string;
+  technicianId?: number;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  vehicleVin?: string;
+  vehicleMake?: string;
+  vehicleModel?: string;
+};
+
+export type BusyWindow = {
+  startTime: string;
+  endTime: string;
+};
+
+export type TechnicianAvailability = {
+  technicianId: number;
+  technicianName: string;
+  date: string;
+  busyWindows: BusyWindow[];
 };
 
 export class ApiError extends Error {
@@ -60,6 +79,21 @@ export function createAppointment(
 export function getAppointment(id: string): Promise<AppointmentResponse> {
   return fetch(`${API_BASE_URL}/appointments/${id}`).then((res) =>
     parseOrThrow<AppointmentResponse>(res),
+  );
+}
+
+export function getTechnicianAvailability(
+  dealershipId: number,
+  serviceType: string,
+  date: string,
+): Promise<TechnicianAvailability[]> {
+  const params = new URLSearchParams({
+    dealershipId: String(dealershipId),
+    serviceType,
+    date,
+  });
+  return fetch(`${API_BASE_URL}/technicians/availability?${params}`).then((res) =>
+    parseOrThrow<TechnicianAvailability[]>(res),
   );
 }
 
