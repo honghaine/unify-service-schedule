@@ -1,6 +1,7 @@
 import AppointmentLookup from "./components/AppointmentLookup";
 import BookingForm from "./components/BookingForm";
 import { Toaster } from "@/components/ui/sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
   return (
@@ -23,10 +24,18 @@ export default function Home() {
           one — or choose your own. Every slot shown is live: book the same
           one twice and the second request gets turned away.
         </p>
-        <div className="grid">
-          <BookingForm />
-          <AppointmentLookup />
-        </div>
+        <Tabs defaultValue="book" className="tabs-shell">
+          <TabsList>
+            <TabsTrigger value="book">Book</TabsTrigger>
+            <TabsTrigger value="lookup">Look up</TabsTrigger>
+          </TabsList>
+          <TabsContent value="book">
+            <BookingForm />
+          </TabsContent>
+          <TabsContent value="lookup">
+            <AppointmentLookup />
+          </TabsContent>
+        </Tabs>
       </main>
     </>
   );
