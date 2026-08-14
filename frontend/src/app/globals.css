@@ -185,31 +185,41 @@ a {
   line-height: 1.55;
 }
 
-.tabs-shell {
-  display: flex;
-  flex-direction: column;
+.page-shell {
   max-width: 460px;
 }
 
-.tabs-shell [data-slot="tabs-list"] {
+.site-nav {
   display: flex;
   flex-direction: row;
-  align-self: flex-start;
-  height: auto;
+  gap: 0.25rem;
   width: fit-content;
-  margin-bottom: 1rem;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--muted);
+  margin-bottom: 1.5rem;
 }
 
-.tabs-shell [data-slot="tabs-trigger"] {
-  flex: none;
-}
-
-.tabs-shell [data-slot="tabs-trigger"] {
+.site-nav-link {
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
   font-family: var(--font-display), sans-serif;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-size: 0.82rem;
+  color: var(--muted-foreground);
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.site-nav-link:hover {
+  color: var(--ink);
+}
+
+.site-nav-link.active {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent);
 }
 
 /* ---------- Work-order ticket card ---------- */
