@@ -23,6 +23,15 @@ const DEALERSHIPS = [
   { id: 2, name: "Uptown Keyloop Motors", specialties: ["OIL_CHANGE", "BRAKES"] },
 ];
 
+const VEHICLE_MAKES = [
+  { make: "Honda", models: ["Accord", "Civic", "CR-V", "Pilot"] },
+  { make: "Toyota", models: ["Camry", "Corolla", "RAV4", "Highlander"] },
+  { make: "Ford", models: ["F-150", "Escape", "Explorer", "Mustang"] },
+  { make: "BMW", models: ["3 Series", "5 Series", "X3", "X5"] },
+  { make: "Chevrolet", models: ["Silverado", "Equinox", "Malibu", "Tahoe"] },
+  { make: "Nissan", models: ["Altima", "Rogue", "Sentra", "Pathfinder"] },
+];
+
 const SLOT_HOURS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
 const FIELD = "flex flex-col gap-[0.35rem]";
@@ -64,8 +73,8 @@ export default function BookingForm() {
   const [dealershipId, setDealershipId] = useState(String(DEALERSHIPS[0].id));
   const [serviceType, setServiceType] = useState(DEALERSHIPS[0].specialties[0]);
 
-  const [vehicleMake, setVehicleMake] = useState("");
-  const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleMake, setVehicleMake] = useState(VEHICLE_MAKES[0].make);
+  const [vehicleModel, setVehicleModel] = useState(VEHICLE_MAKES[0].models[0]);
   const [vehicleVin, setVehicleVin] = useState("");
 
   const [date, setDate] = useState<Date>(startOfToday());
@@ -87,6 +96,7 @@ export default function BookingForm() {
 
   const dateIso = format(date, "yyyy-MM-dd");
   const dealership = DEALERSHIPS.find((d) => d.id === Number(dealershipId)) ?? DEALERSHIPS[0];
+  const selectedMake = VEHICLE_MAKES.find((m) => m.make === vehicleMake) ?? VEHICLE_MAKES[0];
 
   useEffect(() => {
     // Standard data-fetch-with-loading-state effect (react.dev's own
@@ -115,6 +125,15 @@ export default function BookingForm() {
     const next = DEALERSHIPS.find((d) => d.id === Number(nextId));
     if (next && !next.specialties.includes(serviceType)) {
       setServiceType(next.specialties[0]);
+    }
+  }
+
+  function handleMakeChange(nextMake: string | null) {
+    if (!nextMake) return;
+    setVehicleMake(nextMake);
+    const next = VEHICLE_MAKES.find((m) => m.make === nextMake);
+    if (next && !next.models.includes(vehicleModel)) {
+      setVehicleModel(next.models[0]);
     }
   }
 
@@ -220,11 +239,33 @@ export default function BookingForm() {
             <div className={ROW}>
               <div className={ROW_FIELD}>
                 <Label>Make</Label>
-                <Input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" required />
+                <Select value={vehicleMake} onValueChange={handleMakeChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VEHICLE_MAKES.map((m) => (
+                      <SelectItem key={m.make} value={m.make}>
+                        {m.make}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className={ROW_FIELD}>
                 <Label>Model</Label>
-                <Input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Corolla" required />
+                <Select value={vehicleModel} onValueChange={(v) => v && setVehicleModel(v)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedMake.models.map((model) => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className={FIELD}>
