@@ -4,10 +4,12 @@ info:
   description: >
     Dealership appointment scheduler (Keyloop assessment, Scenario A).
     Auto-assigns a qualified technician and free service bay for a
-    requested vehicle/service/dealership/time window, guaranteeing no two
-    confirmed appointments overlap on the same technician or bay (enforced
-    via MySQL pessimistic locking — see docs/design.md §3).
-  version: "1.0.0"
+    requested vehicle/service/dealership/time window (or a caller-chosen
+    technician), guaranteeing no two confirmed appointments overlap on the
+    same technician or bay (enforced via MySQL pessimistic locking — see
+    docs/design.md §3). A guest customer/vehicle can be created inline on
+    booking; no separate signup step.
+  version: "2.0.0"
 servers:
   - url: http://localhost:8080
     description: Local (docker compose up --build)
@@ -17,21 +19,18 @@ paths:
     post:
       summary: Book an appointment
       description: >
-        Auto-assigns the first qualified technician (specialty matches
-        serviceType, same dealershipId) and the first free service bay at
-        that dealership for the requested window. Caller does not choose
-        technicianId/serviceBayId directly.
+        Bay is always auto-assigned. Technician is auto-assigned (first
+        qualified: specialty matches serviceType, same dealershipId, free
+        for the window) unless technicianId is given explicitly, in which
+        case that technician is locked and availability-checked directly.
+        vehicleId identifies an existing vehicle; omit it and supply the
+        guest fields instead to find-or-create the customer (by email) and
+        vehicle (by VIN) inline. Duplicate concurrent submits of the same
+        request (same time/dealership/service/technician/customer) are
+        rejected with 409 via a server-derived dedup key — no client
+        header needed.
       operationId: createAppointment
       parameters:
-        - name: Idempotency-Key
-          in: header
-          required: false
-          description: >
-            Optional client-supplied key. A second concurrent request with
-            the same key is rejected with 409 before it reaches booking
-            logic. Omitting this header does not change behavior.
-          schema:
-            type: string
         - name: X-Correlation-Id
           in: header
           required: false
@@ -44,12 +43,29 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/CreateAppointmentRequest"
-            example:
-              vehicleId: 1
-              serviceType: OIL_CHANGE
-              dealershipId: 1
-              desiredStart: "2026-09-01T09:00:00"
-              desiredEnd: "2026-09-01T10:00:00"
+            examples:
+              existingVehicle:
+                summary: Existing vehicle, auto-assigned technician
+                value:
+                  vehicleId: 1
+                  serviceType: OIL_CHANGE
+                  dealershipId: 1
+                  desiredStart: "2026-09-01T09:00:00"
+                  desiredEnd: "2026-09-01T10:00:00"
+              guestWithChosenTechnician:
+                summary: Guest booking, explicit technician
+                value:
+                  serviceType: OIL_CHANGE
+                  dealershipId: 1
+                  technicianId: 1
+                  desiredStart: "2026-09-01T09:00:00"
+                  desiredEnd: "2026-09-01T10:00:00"
+                  customerName: Alex Guest
+                  customerEmail: alex@example.com
+                  customerPhone: "555-0100"
+                  vehicleVin: 1HGCM82633A004999
+                  vehicleMake: Honda
+                  vehicleModel: Civic
       responses:
         "201":
           description: Appointment confirmed
@@ -62,22 +78,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/AppointmentResponse"
         "400":
-          description: Validation failure (missing field, or desiredEnd not after desiredStart)
+          description: >
+            Validation failure: missing required field, desiredEnd not
+            after desiredStart, or neither vehicleId nor the full guest
+            field set was provided.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: vehicleId does not exist
+          description: vehicleId does not exist, or technicianId does not exist / is not at dealershipId
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: >
-            No qualified technician or free service bay available for the
-            requested window, OR a request with the same Idempotency-Key
-            is already in flight.
+            No qualified technician (or the requested technicianId) is
+            available for the window, no service bay is available, or a
+            request with the same derived dedup key is already in flight.
           content:
             application/json:
               schema:
@@ -110,8 +129,7 @@ paths:
 
   /technicians/{id}/availability:
     get:
-      summary: Get a technician's confirmed busy windows for a given day
-      description: Manual/demo inspection endpoint, not a hard scenario requirement.
+      summary: Get one technician's confirmed busy windows for a given day
       operationId: getTechnicianAvailability
       parameters:
         - name: id
@@ -140,15 +158,58 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /technicians/availability:
+    get:
+      summary: Get every qualified technician's busy windows for a day
+      description: >
+        Used by the booking calendar/slot picker, which doesn't know a
+        technician id up front — returns all technicians matching
+        dealershipId + serviceType, each with their busy windows for date.
+      operationId: getTechnicianAvailabilityForService
+      parameters:
+        - name: dealershipId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: serviceType
+          in: query
+          required: true
+          schema:
+            type: string
+            example: OIL_CHANGE
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: One entry per qualified technician
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TechnicianAvailability"
+
 components:
   schemas:
     CreateAppointmentRequest:
       type: object
-      required: [vehicleId, serviceType, dealershipId, desiredStart, desiredEnd]
+      description: >
+        Either vehicleId, or the full guest set (customerName,
+        customerEmail, vehicleVin, vehicleMake, vehicleModel) must be
+        present — enforced at validation time (400 if neither).
+      required: [serviceType, dealershipId, desiredStart, desiredEnd]
       properties:
         vehicleId:
           type: integer
           format: int64
+          nullable: true
+          description: Existing vehicle. Omit for a guest booking.
         serviceType:
           type: string
           example: OIL_CHANGE
@@ -162,6 +223,30 @@ components:
           type: string
           format: date-time
           description: Must be after desiredStart.
+        technicianId:
+          type: integer
+          format: int64
+          nullable: true
+          description: Explicit technician choice. Omit to auto-assign.
+        customerName:
+          type: string
+          nullable: true
+        customerEmail:
+          type: string
+          format: email
+          nullable: true
+        customerPhone:
+          type: string
+          nullable: true
+        vehicleVin:
+          type: string
+          nullable: true
+        vehicleMake:
+          type: string
+          nullable: true
+        vehicleModel:
+          type: string
+          nullable: true
 
     AppointmentResponse:
       type: object
@@ -199,6 +284,16 @@ components:
           type: string
           enum: [CONFIRMED, CANCELLED]
 
+    BusyWindow:
+      type: object
+      properties:
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+
     AvailabilityResponse:
       type: object
       properties:
@@ -211,14 +306,23 @@ components:
         busyWindows:
           type: array
           items:
-            type: object
-            properties:
-              startTime:
-                type: string
-                format: date-time
-              endTime:
-                type: string
-                format: date-time
+            $ref: "#/components/schemas/BusyWindow"
+
+    TechnicianAvailability:
+      type: object
+      properties:
+        technicianId:
+          type: integer
+          format: int64
+        technicianName:
+          type: string
+        date:
+          type: string
+          format: date
+        busyWindows:
+          type: array
+          items:
+            $ref: "#/components/schemas/BusyWindow"
 
     ErrorResponse:
       type: object
