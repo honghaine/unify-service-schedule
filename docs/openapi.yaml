@@ -9,10 +9,23 @@ info:
     same technician or bay (enforced via MySQL pessimistic locking — see
     docs/design.md §3). A guest customer/vehicle can be created inline on
     booking; no separate signup step.
-  version: "2.0.0"
+  version: "2.1.0"
 servers:
   - url: http://localhost:8080
     description: Local (docker compose up --build)
+tags:
+  - name: Scheduler
+    description: The graded backend — appointment booking and lookup.
+  - name: Observability - App Metrics
+    description: Exposed by the scheduler app itself (Spring Boot Actuator), scraped by Prometheus.
+  - name: Observability - Prometheus
+    description: >
+      Separate service (localhost:9090) — metrics query API, not part of
+      the scheduler app.
+  - name: Observability - Loki
+    description: >
+      Separate service (localhost:3100) — log query API, not part of the
+      scheduler app. Receives the app's structured JSON logs via Promtail.
 
 paths:
   /appointments:
@@ -30,6 +43,7 @@ paths:
         rejected with 409 via a server-derived dedup key — no client
         header needed.
       operationId: createAppointment
+      tags: [Scheduler]
       parameters:
         - name: X-Correlation-Id
           in: header
@@ -106,6 +120,7 @@ paths:
     get:
       summary: Get an appointment by id
       operationId: getAppointment
+      tags: [Scheduler]
       parameters:
         - name: id
           in: path
@@ -131,6 +146,7 @@ paths:
     get:
       summary: Get one technician's confirmed busy windows for a given day
       operationId: getTechnicianAvailability
+      tags: [Scheduler]
       parameters:
         - name: id
           in: path
@@ -166,6 +182,7 @@ paths:
         technician id up front — returns all technicians matching
         dealershipId + serviceType, each with their busy windows for date.
       operationId: getTechnicianAvailabilityForService
+      tags: [Scheduler]
       parameters:
         - name: dealershipId
           in: query
@@ -194,6 +211,234 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TechnicianAvailability"
+
+  /actuator/prometheus:
+    get:
+      summary: Prometheus-format metrics scrape endpoint
+      description: >
+        Exposed by Spring Boot Actuator on the app's own server
+        (localhost:8080). This is what Prometheus scrapes every 15s
+        (observability-design.md §2) — includes default JVM/HTTP metrics
+        plus booking_attempts_total / booking_conflicts_total.
+      operationId: getAppMetrics
+      tags: [Observability - App Metrics]
+      responses:
+        "200":
+          description: Metrics in Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  # HELP booking_attempts_total Total booking attempts received
+                  # TYPE booking_attempts_total counter
+                  booking_attempts_total 12.0
+                  # HELP booking_conflicts_total Booking attempts that failed with 409
+                  # TYPE booking_conflicts_total counter
+                  booking_conflicts_total 3.0
+
+  /loki/api/v1/query_range:
+    get:
+      summary: Query logs over a time range (LogQL)
+      operationId: lokiQueryRange
+      tags: [Observability - Loki]
+      servers:
+        - url: http://localhost:3100
+          description: Loki (separate service, not the scheduler app)
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: LogQL query, e.g. `{compose_service="app"}` or with a correlation-id filter.
+          schema:
+            type: string
+            example: '{compose_service="app"} |= "correlationId"'
+        - name: start
+          in: query
+          required: false
+          description: Start of range, nanosecond Unix timestamp.
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: false
+          description: End of range, nanosecond Unix timestamp.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: Matching log streams
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LokiQueryResponse"
+
+  /loki/api/v1/query:
+    get:
+      summary: Instant log query (single point in time)
+      operationId: lokiQuery
+      tags: [Observability - Loki]
+      servers:
+        - url: http://localhost:3100
+          description: Loki (separate service, not the scheduler app)
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            example: '{compose_service="app"}'
+      responses:
+        "200":
+          description: Matching log streams
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LokiQueryResponse"
+
+  /loki/api/v1/labels:
+    get:
+      summary: List available label names
+      operationId: lokiLabels
+      tags: [Observability - Loki]
+      servers:
+        - url: http://localhost:3100
+          description: Loki (separate service, not the scheduler app)
+      responses:
+        "200":
+          description: Label names (e.g. compose_service, container, detected_level)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: string
+
+  /loki/api/v1/label/{name}/values:
+    get:
+      summary: List values for a given label
+      operationId: lokiLabelValues
+      tags: [Observability - Loki]
+      servers:
+        - url: http://localhost:3100
+          description: Loki (separate service, not the scheduler app)
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            example: compose_service
+      responses:
+        "200":
+          description: Values for that label
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      type: string
+
+  /api/v1/query:
+    get:
+      summary: Instant metrics query (PromQL)
+      operationId: prometheusQuery
+      tags: [Observability - Prometheus]
+      servers:
+        - url: http://localhost:9090
+          description: Prometheus (separate service, not the scheduler app)
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: PromQL expression.
+          schema:
+            type: string
+            example: rate(booking_attempts_total[5m])
+      responses:
+        "200":
+          description: Query result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrometheusQueryResponse"
+
+  /api/v1/query_range:
+    get:
+      summary: Metrics query over a time range (PromQL)
+      operationId: prometheusQueryRange
+      tags: [Observability - Prometheus]
+      servers:
+        - url: http://localhost:9090
+          description: Prometheus (separate service, not the scheduler app)
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+            example: rate(booking_conflicts_total[5m])
+        - name: start
+          in: query
+          required: true
+          description: Unix timestamp (seconds) or RFC3339.
+          schema:
+            type: string
+        - name: end
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: step
+          in: query
+          required: true
+          description: Query resolution step, e.g. "15s".
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Query result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PrometheusQueryResponse"
+
+  /api/v1/targets:
+    get:
+      summary: Scrape target health (is the app being scraped successfully?)
+      operationId: prometheusTargets
+      tags: [Observability - Prometheus]
+      servers:
+        - url: http://localhost:9090
+          description: Prometheus (separate service, not the scheduler app)
+      responses:
+        "200":
+          description: Active and dropped scrape targets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  data:
+                    type: object
 
 components:
   schemas:
@@ -342,3 +587,62 @@ components:
           type: array
           items:
             type: string
+
+    LokiQueryResponse:
+      type: object
+      description: Loki's own response envelope, not defined by this project.
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            resultType:
+              type: string
+              example: streams
+            result:
+              type: array
+              items:
+                type: object
+                properties:
+                  stream:
+                    type: object
+                    description: Labels for this log stream (compose_service, container, etc).
+                    additionalProperties:
+                      type: string
+                  values:
+                    type: array
+                    description: "[nanosecond timestamp, log line] pairs."
+                    items:
+                      type: array
+                      items:
+                        type: string
+
+    PrometheusQueryResponse:
+      type: object
+      description: Prometheus's own response envelope, not defined by this project.
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            resultType:
+              type: string
+              example: vector
+            result:
+              type: array
+              items:
+                type: object
+                properties:
+                  metric:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  value:
+                    type: array
+                    description: "[unix timestamp, string value] pair (instant query)."
+                    items:
+                      type: string
