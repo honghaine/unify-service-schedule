@@ -1,32 +1,81 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* OS-preference-based dark mode (no toggle/next-themes in this app) —
+   Tailwind v4's own default already does this, but shadcn's generator
+   assumes class-based (.dark) toggling and would otherwise override it. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
 :root {
+  /* Workshop palette — drives every hand-written class below. */
   --bg: #d8d4c7;
   --ink: #221f1c;
   --panel: #f2efe7;
   --panel-line: #b9b3a2;
-  --accent: #e8541e;
-  --accent-ink: #2a1006;
+  --brand: #e8541e;
+  --brand-ink: #2a1006;
   --structural: #14514e;
   --structural-soft: #dfe9e6;
   --stamp: #2f6b4f;
   --warn: #b23a2e;
   --warn-soft: #f6e2de;
-  --muted: color-mix(in srgb, var(--ink) 58%, transparent);
+  --muted-text: color-mix(in srgb, var(--ink) 58%, transparent);
+
+  /* shadcn/base-ui tokens — mapped onto the workshop palette above so
+     imported components (Select, Calendar, Popover, Sonner) render in
+     the same identity instead of shadcn's stock greyscale defaults. */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--panel);
+  --card-foreground: var(--ink);
+  --popover: var(--panel);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-ink);
+  --secondary: var(--structural);
+  --secondary-foreground: var(--structural-soft);
+  --muted: color-mix(in srgb, var(--panel) 88%, var(--ink) 12%);
+  --muted-foreground: var(--muted-text);
+  --accent: var(--structural-soft);
+  --accent-foreground: var(--structural);
+  --destructive: var(--warn);
+  --destructive-foreground: var(--warn-soft);
+  --border: var(--panel-line);
+  --input: var(--panel-line);
+  --ring: var(--structural);
+  --radius: 0.3rem;
+  --chart-1: var(--brand);
+  --chart-2: var(--structural);
+  --chart-3: var(--stamp);
+  --chart-4: var(--warn);
+  --chart-5: var(--muted-text);
+  --sidebar: var(--panel);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--brand-ink);
+  --sidebar-accent: var(--structural-soft);
+  --sidebar-accent-foreground: var(--structural);
+  --sidebar-border: var(--panel-line);
+  --sidebar-ring: var(--structural);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* Every shadcn token above is a var() reference to one of these, so
+       overriding the palette here is enough — nothing else needs
+       restating for dark mode. */
     --bg: #1c1a17;
     --ink: #ece7dc;
     --panel: #2a2621;
     --panel-line: #46403686;
-    --accent: #ff7233;
-    --accent-ink: #1c0a02;
+    --brand: #ff7233;
+    --brand-ink: #1c0a02;
     --structural: #3aa39d;
     --structural-soft: #1e3634;
     --stamp: #5fbf8f;
     --warn: #ef6a5a;
     --warn-soft: #3a201d;
-    --muted: color-mix(in srgb, var(--ink) 62%, transparent);
+    --muted-text: color-mix(in srgb, var(--ink) 62%, transparent);
   }
 }
 
@@ -107,8 +156,8 @@ a {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  background: var(--brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent);
 }
 
 /* ---------- Page ---------- */
@@ -130,7 +179,7 @@ a {
 }
 
 .subtitle {
-  color: var(--muted);
+  color: var(--muted-text);
   max-width: 60ch;
   margin-bottom: 2.25rem;
   line-height: 1.55;
@@ -190,7 +239,7 @@ a {
   font-family: var(--font-mono), monospace;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: var(--muted-text);
   white-space: nowrap;
 }
 
@@ -201,10 +250,14 @@ a {
   gap: 1.1rem;
 }
 
-.card label {
+.card label,
+.card .field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+}
+
+.card [data-slot="label"] {
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -215,7 +268,8 @@ a {
   gap: 0.9rem;
 }
 
-.card .row label {
+.card .row label,
+.card .row .field {
   flex: 1;
   min-width: 0;
 }
@@ -226,8 +280,8 @@ a {
   }
 }
 
-.card input,
-.card select {
+/* Plain (non-shadcn) inputs still used outside the migrated fields. */
+.card input:not([data-slot="input"]) {
   padding: 0.55rem 0.65rem;
   border-radius: 3px;
   border: 1px solid var(--panel-line);
@@ -235,10 +289,6 @@ a {
   color: var(--ink);
   font-size: 0.95rem;
   font-family: var(--font-body), sans-serif;
-}
-
-.card input::placeholder {
-  color: color-mix(in srgb, var(--ink) 38%, transparent);
 }
 
 .card input.mono-input {
@@ -250,8 +300,8 @@ a {
   padding: 0.7rem 1rem;
   border-radius: 3px;
   border: none;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--brand);
+  color: var(--brand-ink);
   font-family: var(--font-display), sans-serif;
   font-weight: 700;
   font-size: 1rem;
@@ -306,7 +356,7 @@ a {
 
 .hint {
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 
 /* ---------- Slot punch grid ---------- */
@@ -402,5 +452,65 @@ a {
   }
   .card button[type="submit"] {
     transition: none;
+  }
+}
+
+@theme inline {
+  --font-heading: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* No .dark class block: this app has no theme toggle, so dark mode is
+   driven entirely by the @media (prefers-color-scheme) override on :root
+   above — every shadcn token here is a var() reference to that palette. */
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
   }
 }

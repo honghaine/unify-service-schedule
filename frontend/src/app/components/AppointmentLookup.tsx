@@ -2,6 +2,9 @@
 
 import { useState, type FormEvent } from "react";
 import { describeError, getAppointment, type AppointmentResponse } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function AppointmentLookup() {
   const [id, setId] = useState("");
@@ -31,9 +34,9 @@ export default function AppointmentLookup() {
       </div>
 
       <div className="card-body">
-        <label>
-          Appointment No.
-          <input
+        <div className="field">
+          <Label>Appointment No.</Label>
+          <Input
             className="mono-input"
             value={id}
             onChange={(e) => setId(e.target.value)}
@@ -42,15 +45,17 @@ export default function AppointmentLookup() {
             placeholder="e.g. 42"
             required
           />
-        </label>
+        </div>
 
-        <button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading}>
           {loading ? "Looking up…" : "Get appointment"}
-        </button>
+        </Button>
 
         {result && (
           <div className="result success">
-            <strong>No. {result.id} — {result.status}</strong>
+            <strong>
+              No. {result.id} — {result.status}
+            </strong>
             <p>
               Vehicle {result.vehicleVin} · {result.technicianName} · Bay {result.bayNumber}
             </p>

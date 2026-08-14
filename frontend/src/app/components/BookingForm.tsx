@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   createAppointment,
   describeError,
@@ -8,6 +11,12 @@ import {
   type AppointmentResponse,
   type TechnicianAvailability,
 } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const DEALERSHIPS = [
   { id: 1, name: "Downtown Keyloop Motors", specialties: ["OIL_CHANGE", "BRAKES", "TIRE_ROTATION"] },
@@ -28,8 +37,10 @@ function formatSlotLabel(hhmm: string): string {
   return `${hour12}:00 ${period}`;
 }
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+function startOfToday(): Date {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 function slotOverlapsBusyWindow(dateIso: string, slotStart: string, busy: { startTime: string; endTime: string }): boolean {
@@ -48,7 +59,8 @@ export default function BookingForm() {
   const [vehicleModel, setVehicleModel] = useState("");
   const [vehicleVin, setVehicleVin] = useState("");
 
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState<Date>(startOfToday());
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [technicianIdRaw, setTechnicianId] = useState("");
 
@@ -64,10 +76,10 @@ export default function BookingForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const dateIso = format(date, "yyyy-MM-dd");
   const dealership = DEALERSHIPS.find((d) => d.id === Number(dealershipId)) ?? DEALERSHIPS[0];
 
   useEffect(() => {
-    if (!date) return;
     // Standard data-fetch-with-loading-state effect (react.dev's own
     // "Fetching data" example uses this exact shape) — not the derived-state
     // anti-pattern react-hooks/set-state-in-effect otherwise guards against.
@@ -75,11 +87,11 @@ export default function BookingForm() {
     setAvailabilityLoading(true);
     setAvailabilityError(null);
     setSelectedSlot(null);
-    getTechnicianAvailability(Number(dealershipId), serviceType, date)
+    getTechnicianAvailability(Number(dealershipId), serviceType, dateIso)
       .then((data) => setAvailability(data))
       .catch((err) => setAvailabilityError(describeError(err)))
       .finally(() => setAvailabilityLoading(false));
-  }, [dealershipId, serviceType, date]);
+  }, [dealershipId, serviceType, dateIso]);
 
   // Derived during render rather than synced via a second effect: if the
   // stored pick is no longer in the current availability list (dealership/
@@ -88,7 +100,8 @@ export default function BookingForm() {
     ? technicianIdRaw
     : "";
 
-  function handleDealershipChange(nextId: string) {
+  function handleDealershipChange(nextId: string | null) {
+    if (!nextId) return;
     setDealershipId(nextId);
     const next = DEALERSHIPS.find((d) => d.id === Number(nextId));
     if (next && !next.specialties.includes(serviceType)) {
@@ -97,7 +110,7 @@ export default function BookingForm() {
   }
 
   function techniciansFreeAt(slot: string): TechnicianAvailability[] {
-    return availability.filter((t) => !t.busyWindows.some((w) => slotOverlapsBusyWindow(date, slot, w)));
+    return availability.filter((t) => !t.busyWindows.some((w) => slotOverlapsBusyWindow(dateIso, slot, w)));
   }
 
   function isSlotBookable(slot: string): boolean {
@@ -118,8 +131,8 @@ export default function BookingForm() {
       const appointment = await createAppointment({
         serviceType,
         dealershipId: Number(dealershipId),
-        desiredStart: `${date}T${selectedSlot}:00`,
-        desiredEnd: `${date}T${addHour(selectedSlot)}:00`,
+        desiredStart: `${dateIso}T${selectedSlot}:00`,
+        desiredEnd: `${dateIso}T${addHour(selectedSlot)}:00`,
         technicianId: technicianId ? Number(technicianId) : undefined,
         customerName,
         customerEmail,
@@ -129,8 +142,13 @@ export default function BookingForm() {
         vehicleModel,
       });
       setResult(appointment);
+      toast.success(`Ticket No. ${appointment.id} confirmed`, {
+        description: `${appointment.technicianName} · Bay ${appointment.bayNumber} · ${appointment.startTime}`,
+      });
     } catch (err) {
-      setError(describeError(err));
+      const message = describeError(err);
+      setError(message);
+      toast.error("Booking rejected", { description: message });
     } finally {
       setLoading(false);
     }
@@ -147,26 +165,38 @@ export default function BookingForm() {
         <div className="step">
           <span className="step-number">01</span>
           <div className="step-body">
-            <label>
-              Dealership
-              <select value={dealershipId} onChange={(e) => handleDealershipChange(e.target.value)}>
-                {DEALERSHIPS.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Service
-              <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-                {dealership.specialties.map((s) => (
-                  <option key={s} value={s}>
-                    {s.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="field">
+              <Label>Dealership</Label>
+              <Select value={dealershipId} onValueChange={handleDealershipChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string) => DEALERSHIPS.find((d) => String(d.id) === value)?.name ?? value}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {DEALERSHIPS.map((d) => (
+                    <SelectItem key={d.id} value={String(d.id)}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="field">
+              <Label>Service</Label>
+              <Select value={serviceType} onValueChange={(v) => v && setServiceType(v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>{(value: string) => value.replaceAll("_", " ")}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {dealership.specialties.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replaceAll("_", " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -174,35 +204,59 @@ export default function BookingForm() {
           <span className="step-number">02</span>
           <div className="step-body">
             <div className="row">
-              <label>
-                Make
-                <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" required />
-              </label>
-              <label>
-                Model
-                <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Corolla" required />
-              </label>
+              <div className="field">
+                <Label>Make</Label>
+                <Input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" required />
+              </div>
+              <div className="field">
+                <Label>Model</Label>
+                <Input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Corolla" required />
+              </div>
             </div>
-            <label>
-              VIN / registration
-              <input
+            <div className="field">
+              <Label>VIN / registration</Label>
+              <Input
                 className="mono-input"
                 value={vehicleVin}
                 onChange={(e) => setVehicleVin(e.target.value)}
                 placeholder="e.g. 1HGCM82633A004352"
                 required
               />
-            </label>
+            </div>
           </div>
         </div>
 
         <div className="step">
           <span className="step-number">03</span>
           <div className="step-body">
-            <label>
-              Date
-              <input value={date} onChange={(e) => setDate(e.target.value)} type="date" min={todayIso()} required />
-            </label>
+            <div className="field">
+              <Label>Date</Label>
+              <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button type="button" variant="outline" className="w-full justify-start font-normal">
+                      <CalendarIcon className="size-4" />
+                      {format(date, "EEE, MMM d yyyy")}
+                    </Button>
+                  }
+                />
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    className="[--cell-size:2.25rem]"
+                    selected={date}
+                    defaultMonth={date}
+                    disabled={{ before: startOfToday() }}
+                    onSelect={(picked) => {
+                      if (picked) {
+                        setDate(picked);
+                        setDatePickerOpen(false);
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
 
             {availabilityLoading && <p className="hint">Checking the bay schedule…</p>}
             {availabilityError && <div className="result error">{availabilityError}</div>}
@@ -231,40 +285,51 @@ export default function BookingForm() {
         <div className="step">
           <span className="step-number">04</span>
           <div className="step-body">
-            <label>
-              Technician
-              <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
-                <option value="">No preference — assign for me</option>
-                {availability.map((t) => (
-                  <option
-                    key={t.technicianId}
-                    value={t.technicianId}
-                    disabled={selectedSlot ? !techniciansFreeAt(selectedSlot).some((f) => f.technicianId === t.technicianId) : false}
-                  >
-                    {t.technicianName}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="field">
+              <Label>Technician</Label>
+              <Select value={technicianId || "any"} onValueChange={(v) => setTechnicianId(!v || v === "any" ? "" : v)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {(value: string) =>
+                      value === "any"
+                        ? "No preference — assign for me"
+                        : (availability.find((t) => String(t.technicianId) === value)?.technicianName ?? value)
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">No preference — assign for me</SelectItem>
+                  {availability.map((t) => (
+                    <SelectItem
+                      key={t.technicianId}
+                      value={String(t.technicianId)}
+                      disabled={selectedSlot ? !techniciansFreeAt(selectedSlot).some((f) => f.technicianId === t.technicianId) : false}
+                    >
+                      {t.technicianName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
         <div className="step">
           <span className="step-number">05</span>
           <div className="step-body">
-            <label>
-              Full name
-              <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-            </label>
+            <div className="field">
+              <Label>Full name</Label>
+              <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+            </div>
             <div className="row">
-              <label>
-                Email
-                <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required />
-              </label>
-              <label>
-                Phone
-                <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} type="tel" placeholder="555-0100" required />
-              </label>
+              <div className="field">
+                <Label>Email</Label>
+                <Input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required />
+              </div>
+              <div className="field">
+                <Label>Phone</Label>
+                <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} type="tel" placeholder="555-0100" required />
+              </div>
             </div>
           </div>
         </div>

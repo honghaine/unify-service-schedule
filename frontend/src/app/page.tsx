@@ -1,9 +1,11 @@
 import AppointmentLookup from "./components/AppointmentLookup";
 import BookingForm from "./components/BookingForm";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function Home() {
   return (
     <>
+      <Toaster position="top-right" />
       <header className="shopfront">
         <div className="shopfront-inner">
           <span className="shopfront-mark">Keyloop Service Dept.</span>
