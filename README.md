@@ -93,28 +93,26 @@ Document](docs/design.md) §3) — they're additive.
 | Grafana | http://localhost:3001 | anonymous admin access enabled for local demo; dashboard: "Unified Service Scheduler" |
 | Loki | http://localhost:3100 | log storage, queried via Grafana |
 
-### Idempotency-Key (optional)
+### Idempotency (automatic, no header)
 
-`POST /appointments` accepts an optional `Idempotency-Key` header. A second
-concurrent request with the same key gets an immediate `409` before it ever
-reaches the booking logic — useful for retry-safe clients (e.g. a double
-form submit). Omitting the header is unchanged from before this feature.
-
-```bash
-curl -X POST http://localhost:8080/appointments \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: my-retry-key-123" \
-  -d '{"vehicleId":1,"serviceType":"OIL_CHANGE","dealershipId":1,"desiredStart":"2026-09-01T09:00:00","desiredEnd":"2026-09-01T10:00:00"}'
-```
+`POST /appointments` derives a dedup key server-side from
+`desiredStart|desiredEnd|dealershipId|serviceType|technicianId-or-"any"|email-or-vehicleId`.
+A second concurrent submit of the same request gets an immediate `409`
+before it ever reaches booking logic — no client-supplied header needed.
+Redis being unreachable fails open (request proceeds as normal); it's a
+dedup convenience, not the correctness guarantee (that's still MySQL row
+locking, see [design.md](docs/design.md) §3).
 
 ## API
 
 ### `POST /appointments`
 
-Books an appointment. The caller does **not** pick a technician or bay — the
-service auto-assigns the first technician whose `specialty` matches
-`serviceType` at the given `dealershipId` and is free for the window, plus
-the first free bay at that dealership. See "Assumptions" below.
+Books an appointment. Bay is always auto-assigned; technician is
+auto-assigned unless `technicianId` is given explicitly. `vehicleId`
+identifies an existing vehicle, or omit it and pass the guest fields
+(`customerName`, `customerEmail`, `customerPhone`, `vehicleVin`,
+`vehicleMake`, `vehicleModel`) to find-or-create the customer/vehicle
+inline.
 
 ```bash
 curl -X POST http://localhost:8080/appointments \
@@ -132,6 +130,20 @@ curl -X POST http://localhost:8080/appointments \
 #  "bayNumber":"A1","serviceType":"OIL_CHANGE",
 #  "startTime":"2026-09-01T09:00:00","endTime":"2026-09-01T10:00:00",
 #  "status":"CONFIRMED"}
+```
+
+Guest booking (no `vehicleId`) + explicit technician:
+
+```bash
+curl -X POST http://localhost:8080/appointments \
+  -H "Content-Type: application/json" \
+  -d '{
+    "serviceType": "OIL_CHANGE", "dealershipId": 1, "technicianId": 1,
+    "desiredStart": "2026-09-01T09:00:00", "desiredEnd": "2026-09-01T10:00:00",
+    "customerName": "Alex Guest", "customerEmail": "alex@example.com",
+    "customerPhone": "555-0100", "vehicleVin": "1HGCM82633A004999",
+    "vehicleMake": "Honda", "vehicleModel": "Civic"
+  }'
 ```
 
 Booking the same slot again returns `409 Conflict`:
@@ -161,6 +173,26 @@ for manual/demo inspection rather than a hard scenario requirement):
 curl "http://localhost:8080/technicians/1/availability?date=2026-09-01"
 # {"technicianId":1,"date":"2026-09-01","busyWindows":[{"startTime":"2026-09-01T09:00:00","endTime":"2026-09-01T10:00:00"}]}
 ```
+
+### `GET /technicians/availability?dealershipId=&serviceType=&date=`
+
+Every qualified technician's busy windows for the day — what the frontend's
+slot picker calls, since it doesn't know a technician id up front.
+
+```bash
+curl "http://localhost:8080/technicians/availability?dealershipId=1&serviceType=OIL_CHANGE&date=2026-09-01"
+```
+
+## Frontend
+
+Next.js app in `frontend/` (see [frontend/README.md](frontend/README.md)):
+`docker compose up --build` runs the backend, `cd frontend && npm run dev`
+for the UI at http://localhost:3000. Two routes — `/` books (service →
+guest vehicle → calendar/slot picker → technician → contact), `/lookup`
+looks up a ticket by appointment number. Tailwind v4 + shadcn (Select,
+Calendar, Popover, Sonner toast); not the graded deliverable, just a way
+to exercise the API visually — see [design.md](docs/design.md) §8 for the
+design rationale.
 
 ## Assumptions
 

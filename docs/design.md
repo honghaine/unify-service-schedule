@@ -208,3 +208,33 @@ The one-sentence version: MySQL row locking is still the only thing that
 has ever prevented double-booking — Redis being down never changes a
 booking outcome, only whether a duplicate submit gets deduped early and
 whether a candidate-list read hits cache or DB.
+
+Since then, the idempotency mechanism itself changed: the client-supplied
+`Idempotency-Key` header described in §6 was replaced with a server-derived
+natural key (`time|dealership|service|technician-or-"any"|email-or-vehicleId`)
+— the request itself defines the dedup key, no header needed, and it
+naturally can't collide across different customers or time slots.
+
+## 8. Addendum: Guest Booking, Technician Choice, and the Frontend
+
+Also added after the initial submission:
+
+- **Guest booking.** `POST /appointments`'s `vehicleId` is now optional;
+  omitting it plus supplying `customerName`/`customerEmail`/`customerPhone`/
+  `vehicleVin`/`vehicleMake`/`vehicleModel` find-or-creates the Customer
+  (by email) and Vehicle (by VIN) inline in the booking transaction —
+  matches a walk-up customer who's never booked before.
+- **Explicit technician choice.** Optional `technicianId` on the same
+  request; `null` keeps the original auto-assign behavior. An explicit pick
+  is still locked and availability-checked the same way (404 wrong
+  dealership, 409 busy) — correctness is unchanged either path.
+- **`GET /technicians/availability`** (dealership+service+date, no
+  technician id) returns every qualified technician's busy windows for a
+  day, for a calendar/slot-picker UI that doesn't know a technician id
+  up front.
+- **Frontend redesign.** The demo UI (`frontend/`, not the graded backend)
+  moved from a single raw form to two routes (`/` book, `/lookup` look up)
+  built on Tailwind v4 + shadcn/ui — a real calendar picker, animated
+  selects, toast feedback — themed as a "workshop service-ticket": stencil
+  display type for step markers, a torn-edge ticket card, a rubber-stamp
+  confirmation. Detail in [frontend/README.md](../frontend/README.md).

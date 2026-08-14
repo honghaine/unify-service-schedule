@@ -1,15 +1,19 @@
 # Scheduler Demo UI
 
-Minimal Next.js frontend for the [Unified Service Scheduler API](../README.md)
-(Keyloop assessment, Scenario A backend). Not part of the graded backend
-deliverable — a demo client for exercising the booking flow visually instead
-of via cURL.
+Next.js frontend for the [Unified Service Scheduler API](../README.md)
+(Keyloop assessment, Scenario A backend). Not the graded deliverable — a
+demo client for exercising the booking flow visually instead of via cURL.
 
-Two forms, both calling the backend directly from the browser:
+Two routes:
 
-- **Book an appointment** — `POST /appointments`. Shows the confirmed
-  technician/bay on success, or the error body (400/404/409) on failure.
-- **Look up an appointment** — `GET /appointments/{id}`.
+- **`/`** — book an appointment: dealership/service → guest vehicle
+  (make/model/VIN) → date + calendar slot picker → technician (optional,
+  "no preference" auto-assigns) → contact info. `POST /appointments`.
+- **`/lookup`** — look up a ticket by appointment number. `GET /appointments/{id}`.
+
+Styled with Tailwind v4 + shadcn/ui (Select, Calendar, Popover, Sonner
+toast) on a custom "workshop service-ticket" theme (see
+[design.md](../docs/design.md) §8).
 
 ## Run
 
@@ -36,7 +40,6 @@ in the backend).
 
 ## Try the conflict path
 
-Book vehicle `1`, `OIL_CHANGE`, Downtown Keyloop Motors, any date/time —
-then submit the exact same form again. First submission confirms; second
-returns a `409` (dealership 1 has exactly one `OIL_CHANGE` technician in the
-seed data).
+Book the same dealership/service/slot twice (any guest vehicle details —
+they're find-or-created by VIN/email, so reusing them across two bookings
+is fine). First submission confirms; second returns a `409`.
