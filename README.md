@@ -73,7 +73,7 @@ container via Testcontainers (no H2/mocking of the database). 19 tests across
 
 | Dealership 1 (id=1) | Dealership 2 (id=2) |
 |---|---|
-| Technicians: Sam Rivera (OIL_CHANGE), Jordan Lee (BRAKES), Taylor Brooks (TIRE_ROTATION) | Morgan Blake (OIL_CHANGE), Casey Kim (BRAKES) |
+| Technicians: Sam Rivera (OIL_CHANGE), Jordan Lee (BRAKES), Taylor Brooks (TIRE_ROTATION) | Morgan Blake (OIL_CHANGE), Casey Kim (BRAKES), Riley Chen (TIRE_ROTATION) |
 | Service bays: A1, A2 | Service bay: B1 |
 
 Vehicles: id=1 (Honda Accord, customer 1), id=2 (Ford F-150, customer 2),

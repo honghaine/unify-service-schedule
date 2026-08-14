@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const DEALERSHIPS = [
   { id: 1, name: "Downtown Keyloop Motors", specialties: ["OIL_CHANGE", "BRAKES", "TIRE_ROTATION"] },
-  { id: 2, name: "Uptown Keyloop Motors", specialties: ["OIL_CHANGE", "BRAKES"] },
+  { id: 2, name: "Uptown Keyloop Motors", specialties: ["OIL_CHANGE", "BRAKES", "TIRE_ROTATION"] },
 ];
 
 const VEHICLE_MAKES = [
