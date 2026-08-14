@@ -138,143 +138,154 @@ export default function BookingForm() {
 
   return (
     <form onSubmit={handleSubmit} className="card">
-      <h2>Book an appointment</h2>
-
-      <div className="step">
-        <span className="step-number">1</span>
-        <div className="step-body">
-          <label>
-            Dealership
-            <select value={dealershipId} onChange={(e) => handleDealershipChange(e.target.value)}>
-              {DEALERSHIPS.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Service
-            <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-              {dealership.specialties.map((s) => (
-                <option key={s} value={s}>
-                  {s.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+      <div className="ticket-head">
+        <h2>Work order</h2>
+        <span className="ticket-no">{result ? `No. ${result.id}` : "DRAFT"}</span>
       </div>
 
-      <div className="step">
-        <span className="step-number">2</span>
-        <div className="step-body">
-          <div className="row">
+      <div className="card-body">
+        <div className="step">
+          <span className="step-number">01</span>
+          <div className="step-body">
             <label>
-              Make
-              <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" required />
+              Dealership
+              <select value={dealershipId} onChange={(e) => handleDealershipChange(e.target.value)}>
+                {DEALERSHIPS.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
-              Model
-              <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Corolla" required />
+              Service
+              <select value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+                {dealership.specialties.map((s) => (
+                  <option key={s} value={s}>
+                    {s.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
-          <label>
-            VIN / registration
-            <input value={vehicleVin} onChange={(e) => setVehicleVin(e.target.value)} placeholder="e.g. 1HGCM82633A004352" required />
-          </label>
         </div>
-      </div>
 
-      <div className="step">
-        <span className="step-number">3</span>
-        <div className="step-body">
-          <label>
-            Date
-            <input value={date} onChange={(e) => setDate(e.target.value)} type="date" min={todayIso()} required />
-          </label>
-
-          {availabilityLoading && <p className="hint">Checking availability…</p>}
-          {availabilityError && <div className="result error">{availabilityError}</div>}
-
-          {!availabilityLoading && !availabilityError && (
-            <div className="slot-grid">
-              {SLOT_HOURS.map((slot) => {
-                const bookable = isSlotBookable(slot);
-                return (
-                  <button
-                    type="button"
-                    key={slot}
-                    disabled={!bookable}
-                    className={`slot-btn${selectedSlot === slot ? " selected" : ""}`}
-                    onClick={() => setSelectedSlot(slot)}
-                  >
-                    {formatSlotLabel(slot)}
-                  </button>
-                );
-              })}
+        <div className="step">
+          <span className="step-number">02</span>
+          <div className="step-body">
+            <div className="row">
+              <label>
+                Make
+                <input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" required />
+              </label>
+              <label>
+                Model
+                <input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Corolla" required />
+              </label>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="step">
-        <span className="step-number">4</span>
-        <div className="step-body">
-          <label>
-            Technician
-            <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
-              <option value="">No preference — assign for me</option>
-              {availability.map((t) => (
-                <option
-                  key={t.technicianId}
-                  value={t.technicianId}
-                  disabled={selectedSlot ? !techniciansFreeAt(selectedSlot).some((f) => f.technicianId === t.technicianId) : false}
-                >
-                  {t.technicianName}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <div className="step">
-        <span className="step-number">5</span>
-        <div className="step-body">
-          <label>
-            Full name
-            <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-          </label>
-          <div className="row">
             <label>
-              Email
-              <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required />
-            </label>
-            <label>
-              Phone
-              <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} type="tel" placeholder="555-0100" required />
+              VIN / registration
+              <input
+                className="mono-input"
+                value={vehicleVin}
+                onChange={(e) => setVehicleVin(e.target.value)}
+                placeholder="e.g. 1HGCM82633A004352"
+                required
+              />
             </label>
           </div>
         </div>
-      </div>
 
-      <button type="submit" disabled={loading || !selectedSlot}>
-        {loading ? "Booking…" : selectedSlot ? `Book ${formatSlotLabel(selectedSlot)}` : "Pick a time slot"}
-      </button>
+        <div className="step">
+          <span className="step-number">03</span>
+          <div className="step-body">
+            <label>
+              Date
+              <input value={date} onChange={(e) => setDate(e.target.value)} type="date" min={todayIso()} required />
+            </label>
 
-      {result && (
-        <div className="result success">
-          <strong>Confirmed — appointment #{result.id}</strong>
-          <p>
-            {result.technicianName} · Bay {result.bayNumber} · {result.serviceType.replaceAll("_", " ")}
-          </p>
-          <p>
-            {result.startTime} → {result.endTime}
-          </p>
+            {availabilityLoading && <p className="hint">Checking the bay schedule…</p>}
+            {availabilityError && <div className="result error">{availabilityError}</div>}
+
+            {!availabilityLoading && !availabilityError && (
+              <div className="slot-grid">
+                {SLOT_HOURS.map((slot) => {
+                  const bookable = isSlotBookable(slot);
+                  return (
+                    <button
+                      type="button"
+                      key={slot}
+                      disabled={!bookable}
+                      className={`slot-btn${selectedSlot === slot ? " selected" : ""}`}
+                      onClick={() => setSelectedSlot(slot)}
+                    >
+                      {formatSlotLabel(slot)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-      {error && <div className="result error">{error}</div>}
+
+        <div className="step">
+          <span className="step-number">04</span>
+          <div className="step-body">
+            <label>
+              Technician
+              <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)}>
+                <option value="">No preference — assign for me</option>
+                {availability.map((t) => (
+                  <option
+                    key={t.technicianId}
+                    value={t.technicianId}
+                    disabled={selectedSlot ? !techniciansFreeAt(selectedSlot).some((f) => f.technicianId === t.technicianId) : false}
+                  >
+                    {t.technicianName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div className="step">
+          <span className="step-number">05</span>
+          <div className="step-body">
+            <label>
+              Full name
+              <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+            </label>
+            <div className="row">
+              <label>
+                Email
+                <input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required />
+              </label>
+              <label>
+                Phone
+                <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} type="tel" placeholder="555-0100" required />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" disabled={loading || !selectedSlot}>
+          {loading ? "Booking…" : selectedSlot ? `Book ${formatSlotLabel(selectedSlot)}` : "Pick a time slot"}
+        </button>
+
+        {result && (
+          <div className="result success">
+            <strong>Confirmed — No. {result.id}</strong>
+            <p>
+              {result.technicianName} · Bay {result.bayNumber} · {result.serviceType.replaceAll("_", " ")}
+            </p>
+            <p>
+              {result.startTime} → {result.endTime}
+            </p>
+          </div>
+        )}
+        {error && <div className="result error">{error}</div>}
+      </div>
     </form>
   );
 }

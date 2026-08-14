@@ -25,31 +25,42 @@ export default function AppointmentLookup() {
 
   return (
     <form onSubmit={handleSubmit} className="card">
-      <h2>Look up an appointment</h2>
+      <div className="ticket-head">
+        <h2>Look up a ticket</h2>
+        <span className="ticket-no">LOOKUP</span>
+      </div>
 
-      <label>
-        Appointment ID
-        <input value={id} onChange={(e) => setId(e.target.value)} type="number" min={1} required />
-      </label>
+      <div className="card-body">
+        <label>
+          Appointment No.
+          <input
+            className="mono-input"
+            value={id}
+            onChange={(e) => setId(e.target.value)}
+            type="number"
+            min={1}
+            placeholder="e.g. 42"
+            required
+          />
+        </label>
 
-      <button type="submit" disabled={loading}>
-        {loading ? "Looking up…" : "Get appointment"}
-      </button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Looking up…" : "Get appointment"}
+        </button>
 
-      {result && (
-        <div className="result success">
-          <strong>
-            Appointment #{result.id} — {result.status}
-          </strong>
-          <p>
-            Vehicle {result.vehicleVin} · {result.technicianName} · Bay {result.bayNumber}
-          </p>
-          <p>
-            {result.serviceType.replaceAll("_", " ")} · {result.startTime} → {result.endTime}
-          </p>
-        </div>
-      )}
-      {error && <div className="result error">{error}</div>}
+        {result && (
+          <div className="result success">
+            <strong>No. {result.id} — {result.status}</strong>
+            <p>
+              Vehicle {result.vehicleVin} · {result.technicianName} · Bay {result.bayNumber}
+            </p>
+            <p>
+              {result.serviceType.replaceAll("_", " ")} · {result.startTime} → {result.endTime}
+            </p>
+          </div>
+        )}
+        {error && <div className="result error">{error}</div>}
+      </div>
     </form>
   );
 }

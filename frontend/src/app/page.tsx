@@ -3,19 +3,29 @@ import BookingForm from "./components/BookingForm";
 
 export default function Home() {
   return (
-    <main className="page">
-      <h1>Unified Service Scheduler</h1>
-      <p className="subtitle">
-        Demo UI for the Keyloop Scenario A backend. Pick a service, vehicle,
-        date and time slot — leave the technician on &ldquo;no
-        preference&rdquo; and the backend auto-assigns a qualified,
-        available one, or pick a specific technician yourself. Book the
-        same slot twice to see the 409 conflict.
-      </p>
-      <div className="grid">
-        <BookingForm />
-        <AppointmentLookup />
-      </div>
-    </main>
+    <>
+      <header className="shopfront">
+        <div className="shopfront-inner">
+          <span className="shopfront-mark">Keyloop Service Dept.</span>
+          <span className="shopfront-status">
+            <span className="dot" aria-hidden="true" />
+            Booking open
+          </span>
+        </div>
+      </header>
+      <main className="page">
+        <h1>Unified Service Scheduler</h1>
+        <p className="subtitle">
+          Pick a service, a vehicle, and a time slot. Leave the technician on
+          &ldquo;no preference&rdquo; and we assign a qualified, available
+          one — or choose your own. Every slot shown is live: book the same
+          one twice and the second request gets turned away.
+        </p>
+        <div className="grid">
+          <BookingForm />
+          <AppointmentLookup />
+        </div>
+      </main>
+    </>
   );
 }
