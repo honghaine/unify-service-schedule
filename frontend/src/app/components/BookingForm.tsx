@@ -25,6 +25,15 @@ const DEALERSHIPS = [
 
 const SLOT_HOURS = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
+const FIELD = "flex flex-col gap-[0.35rem]";
+const ROW = "flex gap-[0.9rem] max-[480px]:flex-col";
+const ROW_FIELD = `${FIELD} min-w-0 flex-1`;
+const STEP = "flex items-start gap-[0.85rem]";
+const STEP_NUMBER =
+  "flex size-8 flex-none rotate-[-2deg] items-center justify-center rounded-[2px] border border-structural/35 bg-structural-soft font-heading text-[1.05rem] font-extrabold text-structural";
+const STEP_BODY = "flex flex-1 flex-col gap-[0.7rem] pt-[0.15rem]";
+const RESULT_ERROR = "rounded-[3px] border border-warn bg-warn-soft px-4 py-[0.85rem] text-[0.875rem] leading-[1.5] text-ink";
+
 function addHour(hhmm: string): string {
   const [h, m] = hhmm.split(":").map(Number);
   return `${String(h + 1).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -155,17 +164,22 @@ export default function BookingForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card">
-      <div className="ticket-head">
-        <h2>Work order</h2>
-        <span className="ticket-no">{result ? `No. ${result.id}` : "DRAFT"}</span>
+    <form
+      onSubmit={handleSubmit}
+      className="relative flex flex-col overflow-hidden rounded-[4px] border border-panel-line bg-panel before:block before:h-[10px] before:[background-image:radial-gradient(circle_at_10px_5px,var(--bg)_4px,transparent_4.5px)] before:[background-repeat:repeat-x] before:[background-size:20px_10px]"
+    >
+      <div className="flex items-baseline justify-between border-b border-dashed border-panel-line px-6 pt-4 pb-3">
+        <h2 className="font-heading text-[1.05rem] font-bold tracking-[0.03em] uppercase">Work order</h2>
+        <span className="font-mono text-[0.72rem] tracking-[0.04em] whitespace-nowrap text-muted-text">
+          {result ? `No. ${result.id}` : "DRAFT"}
+        </span>
       </div>
 
-      <div className="card-body">
-        <div className="step">
-          <span className="step-number">01</span>
-          <div className="step-body">
-            <div className="field">
+      <div className="flex flex-col gap-[1.1rem] px-6 pt-[1.35rem] pb-6">
+        <div className={STEP}>
+          <span className={STEP_NUMBER}>01</span>
+          <div className={STEP_BODY}>
+            <div className={FIELD}>
               <Label>Dealership</Label>
               <Select value={dealershipId} onValueChange={handleDealershipChange}>
                 <SelectTrigger className="w-full">
@@ -182,7 +196,7 @@ export default function BookingForm() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="field">
+            <div className={FIELD}>
               <Label>Service</Label>
               <Select value={serviceType} onValueChange={(v) => v && setServiceType(v)}>
                 <SelectTrigger className="w-full">
@@ -200,23 +214,23 @@ export default function BookingForm() {
           </div>
         </div>
 
-        <div className="step">
-          <span className="step-number">02</span>
-          <div className="step-body">
-            <div className="row">
-              <div className="field">
+        <div className={STEP}>
+          <span className={STEP_NUMBER}>02</span>
+          <div className={STEP_BODY}>
+            <div className={ROW}>
+              <div className={ROW_FIELD}>
                 <Label>Make</Label>
                 <Input value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} placeholder="Toyota" required />
               </div>
-              <div className="field">
+              <div className={ROW_FIELD}>
                 <Label>Model</Label>
                 <Input value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} placeholder="Corolla" required />
               </div>
             </div>
-            <div className="field">
+            <div className={FIELD}>
               <Label>VIN / registration</Label>
               <Input
-                className="mono-input"
+                className="font-mono"
                 value={vehicleVin}
                 onChange={(e) => setVehicleVin(e.target.value)}
                 placeholder="e.g. 1HGCM82633A004352"
@@ -226,10 +240,10 @@ export default function BookingForm() {
           </div>
         </div>
 
-        <div className="step">
-          <span className="step-number">03</span>
-          <div className="step-body">
-            <div className="field">
+        <div className={STEP}>
+          <span className={STEP_NUMBER}>03</span>
+          <div className={STEP_BODY}>
+            <div className={FIELD}>
               <Label>Date</Label>
               <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
                 <PopoverTrigger
@@ -258,20 +272,25 @@ export default function BookingForm() {
               </Popover>
             </div>
 
-            {availabilityLoading && <p className="hint">Checking the bay schedule…</p>}
-            {availabilityError && <div className="result error">{availabilityError}</div>}
+            {availabilityLoading && <p className="text-[0.85rem] text-muted-text">Checking the bay schedule…</p>}
+            {availabilityError && <div className={RESULT_ERROR}>{availabilityError}</div>}
 
             {!availabilityLoading && !availabilityError && (
-              <div className="slot-grid">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(90px,1fr))] gap-2">
                 {SLOT_HOURS.map((slot) => {
                   const bookable = isSlotBookable(slot);
+                  const selected = selectedSlot === slot;
                   return (
                     <button
                       type="button"
                       key={slot}
                       disabled={!bookable}
-                      className={`slot-btn${selectedSlot === slot ? " selected" : ""}`}
                       onClick={() => setSelectedSlot(slot)}
+                      className={`rounded-[3px] border px-[0.4rem] py-[0.55rem] font-mono text-[0.82rem] disabled:cursor-not-allowed disabled:opacity-[0.32] disabled:line-through ${
+                        selected
+                          ? "border-structural bg-structural font-semibold text-structural-soft"
+                          : "border-panel-line bg-bg text-ink"
+                      }`}
                     >
                       {formatSlotLabel(slot)}
                     </button>
@@ -282,10 +301,10 @@ export default function BookingForm() {
           </div>
         </div>
 
-        <div className="step">
-          <span className="step-number">04</span>
-          <div className="step-body">
-            <div className="field">
+        <div className={STEP}>
+          <span className={STEP_NUMBER}>04</span>
+          <div className={STEP_BODY}>
+            <div className={FIELD}>
               <Label>Technician</Label>
               <Select value={technicianId || "any"} onValueChange={(v) => setTechnicianId(!v || v === "any" ? "" : v)}>
                 <SelectTrigger className="w-full">
@@ -314,19 +333,19 @@ export default function BookingForm() {
           </div>
         </div>
 
-        <div className="step">
-          <span className="step-number">05</span>
-          <div className="step-body">
-            <div className="field">
+        <div className={STEP}>
+          <span className={STEP_NUMBER}>05</span>
+          <div className={STEP_BODY}>
+            <div className={FIELD}>
               <Label>Full name</Label>
               <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
             </div>
-            <div className="row">
-              <div className="field">
+            <div className={ROW}>
+              <div className={ROW_FIELD}>
                 <Label>Email</Label>
                 <Input value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" required />
               </div>
-              <div className="field">
+              <div className={ROW_FIELD}>
                 <Label>Phone</Label>
                 <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} type="tel" placeholder="555-0100" required />
               </div>
@@ -334,22 +353,28 @@ export default function BookingForm() {
           </div>
         </div>
 
-        <button type="submit" disabled={loading || !selectedSlot}>
+        <button
+          type="submit"
+          disabled={loading || !selectedSlot}
+          className="mt-1 cursor-pointer rounded-[3px] bg-brand px-4 py-[0.7rem] font-heading text-base font-bold tracking-[0.03em] text-brand-ink uppercase transition-transform duration-150 [&:hover:not(:disabled)]:-translate-y-px disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none"
+        >
           {loading ? "Booking…" : selectedSlot ? `Book ${formatSlotLabel(selectedSlot)}` : "Pick a time slot"}
         </button>
 
         {result && (
-          <div className="result success">
-            <strong>Confirmed — No. {result.id}</strong>
-            <p>
+          <div className="relative rotate-[-1.2deg] animate-[stamp-down_0.28s_ease-out] rounded-[4px] border-[3px] border-stamp bg-transparent px-4 py-[0.85rem] text-[0.875rem] leading-[1.5] text-stamp motion-reduce:animate-none">
+            <strong className="inline-block font-heading text-[1.05rem] font-extrabold tracking-[0.05em] uppercase">
+              Confirmed — No. {result.id}
+            </strong>
+            <p className="font-mono text-[0.82rem] text-ink">
               {result.technicianName} · Bay {result.bayNumber} · {result.serviceType.replaceAll("_", " ")}
             </p>
-            <p>
+            <p className="font-mono text-[0.82rem] text-ink">
               {result.startTime} → {result.endTime}
             </p>
           </div>
         )}
-        {error && <div className="result error">{error}</div>}
+        {error && <div className={RESULT_ERROR}>{error}</div>}
       </div>
     </form>
   );

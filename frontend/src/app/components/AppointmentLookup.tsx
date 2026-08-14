@@ -27,17 +27,20 @@ export default function AppointmentLookup() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card">
-      <div className="ticket-head">
-        <h2>Look up a ticket</h2>
-        <span className="ticket-no">LOOKUP</span>
+    <form
+      onSubmit={handleSubmit}
+      className="relative flex flex-col overflow-hidden rounded-[4px] border border-panel-line bg-panel before:block before:h-[10px] before:[background-image:radial-gradient(circle_at_10px_5px,var(--bg)_4px,transparent_4.5px)] before:[background-repeat:repeat-x] before:[background-size:20px_10px]"
+    >
+      <div className="flex items-baseline justify-between border-b border-dashed border-panel-line px-6 pt-4 pb-3">
+        <h2 className="font-heading text-[1.05rem] font-bold tracking-[0.03em] uppercase">Look up a ticket</h2>
+        <span className="font-mono text-[0.72rem] tracking-[0.04em] whitespace-nowrap text-muted-text">LOOKUP</span>
       </div>
 
-      <div className="card-body">
-        <div className="field">
+      <div className="flex flex-col gap-[1.1rem] px-6 pt-[1.35rem] pb-6">
+        <div className="flex flex-col gap-[0.35rem]">
           <Label>Appointment No.</Label>
           <Input
-            className="mono-input"
+            className="font-mono"
             value={id}
             onChange={(e) => setId(e.target.value)}
             type="number"
@@ -47,24 +50,32 @@ export default function AppointmentLookup() {
           />
         </div>
 
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="mt-1 cursor-pointer rounded-[3px] bg-brand px-4 py-[0.7rem] font-heading text-base font-bold tracking-[0.03em] text-brand-ink uppercase transition-transform duration-150 [&:hover:not(:disabled)]:-translate-y-px disabled:cursor-not-allowed disabled:opacity-45 motion-reduce:transition-none"
+        >
           {loading ? "Looking up…" : "Get appointment"}
         </Button>
 
         {result && (
-          <div className="result success">
-            <strong>
+          <div className="relative rotate-[-1.2deg] animate-[stamp-down_0.28s_ease-out] rounded-[4px] border-[3px] border-stamp bg-transparent px-4 py-[0.85rem] text-[0.875rem] leading-[1.5] text-stamp motion-reduce:animate-none">
+            <strong className="inline-block font-heading text-[1.05rem] font-extrabold tracking-[0.05em] uppercase">
               No. {result.id} — {result.status}
             </strong>
-            <p>
+            <p className="font-mono text-[0.82rem] text-ink">
               Vehicle {result.vehicleVin} · {result.technicianName} · Bay {result.bayNumber}
             </p>
-            <p>
+            <p className="font-mono text-[0.82rem] text-ink">
               {result.serviceType.replaceAll("_", " ")} · {result.startTime} → {result.endTime}
             </p>
           </div>
         )}
-        {error && <div className="result error">{error}</div>}
+        {error && (
+          <div className="rounded-[3px] border border-warn bg-warn-soft px-4 py-[0.85rem] text-[0.875rem] leading-[1.5] text-ink">
+            {error}
+          </div>
+        )}
       </div>
     </form>
   );
