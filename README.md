@@ -185,14 +185,36 @@ curl "http://localhost:8080/technicians/availability?dealershipId=1&serviceType=
 
 ## Frontend
 
-Next.js app in `frontend/` (see [frontend/README.md](frontend/README.md)):
-`docker compose up --build` runs the backend, `cd frontend && npm run dev`
-for the UI at http://localhost:3000. Two routes — `/` books (service →
-guest vehicle → calendar/slot picker → technician → contact), `/lookup`
-looks up a ticket by appointment number. Tailwind v4 + shadcn (Select,
-Calendar, Popover, Sonner toast); not the graded deliverable, just a way
-to exercise the API visually — see [design.md](docs/design.md) §8 for the
-design rationale.
+Next.js app in `frontend/` (see [frontend/README.md](frontend/README.md)).
+Two routes — `/` books (service → guest vehicle → calendar/slot picker →
+technician → contact), `/lookup` looks up a ticket by appointment number.
+Tailwind v4 + shadcn (Select, Calendar, Popover, Sonner toast); not the
+graded deliverable, just a way to exercise the API visually — see
+[design.md](docs/design.md) §8 for the design rationale.
+
+### Run the frontend
+
+Backend must be up first (`docker compose up --build`, above). Then, in a
+second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:3000.
+
+By default the UI calls `http://localhost:8080`. If the backend runs
+elsewhere, copy `frontend/.env.local.example` to `frontend/.env.local` and
+set:
+
+```
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+```
+
+(The backend's `WebConfig` allows CORS from `http://localhost:3000`
+specifically for this dev UI.)
 
 ## Assumptions
 
