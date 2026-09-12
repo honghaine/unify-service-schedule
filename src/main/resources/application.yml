@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: scheduler
+
+  # --- Datasource (overridden by docker-compose env vars in compose.yaml) ---
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/scheduler}
+    username: ${SPRING_DATASOURCE_USERNAME:scheduler}
+    password: ${SPRING_DATASOURCE_PASSWORD:scheduler}
+
+  # --- JPA: Flyway owns the schema, Hibernate must never auto-generate DDL ---
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+  # --- Flyway ---
+  flyway:
+    locations: classpath:db/migration
+
+  # --- Redis (idempotency lock + candidate-list cache; overridden by docker-compose / Testcontainers) ---
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  # Force Spring's cache abstraction onto RedisCacheManager. Without this,
+  # Redisson's javax.cache:cache-api dependency puts a JSR-107 CachingProvider
+  # on the classpath, and Spring Boot's cache auto-configuration picks
+  # CacheType.JCACHE before it ever considers CacheType.REDIS — silently
+  # bypassing CacheConfig's RedisCacheManagerBuilderCustomizer (and its TTLs).
+  cache:
+    type: redis
+
+# --- Actuator / metrics ---
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# --- Structured JSON logging (correlation id injected via MDC, see CorrelationIdFilter) ---
+logging:
+  structured:
+    format:
+      console: ecs

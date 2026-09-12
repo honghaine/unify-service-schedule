@@ -33,14 +33,27 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/scheduler
       SPRING_DATASOURCE_USERNAME: scheduler
       SPRING_DATASOURCE_PASSWORD: scheduler
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
     ports:
       - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    depends_on:
+      - app
+    ports:
+      - "3000:3000"
 
   prometheus:
     image: prom/prometheus:v3.0.1
@@ -81,5 +94,56 @@ services:
       - prometheus
       - loki
 
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # Configure KRaft mode settings
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+
+      # Define internal and external listeners
+      KAFKA_LISTENERS: 'CONTROLLER://kafka:29093,PLAINTEXT://kafka:29092,EXTERNAL://0.0.0.0:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+      # Required cluster ID for KRaft initialization
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+      # Default topic configurations
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_FLUSH_INTERVAL_MESSAGES: 9223372036854775807
+      KAFKA_LOG_FLUSH_INTERVAL_MS: 9223372036854775807
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8081:8080"
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: 'local-cluster'
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka:29092'
+    depends_on:
+      - kafka
+
 volumes:
   mysql_data:
+  kafka_data:
