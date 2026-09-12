@@ -126,7 +126,7 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1" ]
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list || exit 1" ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -142,7 +142,8 @@ services:
       KAFKA_CLUSTERS_0_NAME: 'local-cluster'
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka:29092'
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
 
 volumes:
   mysql_data:

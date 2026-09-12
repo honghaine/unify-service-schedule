@@ -47,3 +47,7 @@ logging:
   structured:
     format:
       console: ecs
+
+kafka:
+  topic:
+    name1: payment-events
