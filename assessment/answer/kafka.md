@@ -13,4 +13,14 @@
 - If we increase partition, it will affect the new message, the old message remains the same, but it will break message totally ordering by key, break the algorithm: hash(key) % numPartitions
 - To design the partition key to make it follow ordering with transaction, and avoid hot key, we can combine the transaction_id, use high cardinality and meaningful key, 
 
+## Phase 2 - Producer/Consumer API (Java + Spring Kafka)
+- Acks=0/1/all:
+  - acks = 0: Fire and forget, Producer push message and don need to care if broker receive it yet
+  - acks = 1: Producer pushes message and wait until partition leader (broker) write log then ack, did not wait for replicate to follower.
+    - Risk: leader crash before it sync -> lost message 
+  - acks = all:  
+
+- Why 2 consumers in the same group never consume the same message from the same partition at the same time?
+- Because they have offset, exclusively partition assignment. 
+
 
