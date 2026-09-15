@@ -18,9 +18,19 @@
   - acks = 0: Fire and forget, Producer push message and don need to care if broker receive it yet
   - acks = 1: Producer pushes message and wait until partition leader (broker) write log then ack, did not wait for replicate to follower.
     - Risk: leader crash before it sync -> lost message 
-  - acks = all:  
+  - acks = all: Producer pushes message and wait until partition leader and its replication sync
 
 - Why 2 consumers in the same group never consume the same message from the same partition at the same time?
 - Because they have offset, exclusively partition assignment. 
+- Kafka assigns only one consumer instance in a consumer group to a specific partition at any given time
 
+**Senior: Redesign webhook nhận từ payment gateway (Antom) → Kafka, không mất event nếu crash giữa chừng**
+- Vấn đề gốc: dual-write - nếu handler vừa xử lý business logic vừa publish Kafka trong cùng flow, crash giữa 2 bước sẽ mất event (hoặc publish nhưng chưa lưu DB, hoặc lưu DB nhưng chưa publish).
+- Bước 1 (webhook receive): handler chỉ làm 2 việc - verify signature, rồi persist raw payload vào 1 outbox table (cùng transaction với DB write nghiệp vụ nếu có) - KHÔNG gọi Kafka publish trực tiếp trong request thread. Return 200 cho Antom ngay sau khi persist thành công.
+  - Cần idempotency key (Antom transaction_id/notify_id) unique constraint ở outbox table, vì gateway sẽ retry webhook nếu không nhận 200 đúng hạn -> tránh insert trùng.
+- Bước 2 (publish): 1 process riêng (poller đọc outbox theo interval, hoặc CDC/Debezium tail binlog của outbox table) đọc row chưa publish, gửi vào Kafka với producer idempotent (`enable.idempotence=true`, acks=all), sau khi broker ack thì mark row là published.
+- Vì DB write (outbox) và publish Kafka tách rời, crash ở bất kỳ đâu đều recover được:
+  - Crash sau khi persist outbox nhưng trước khi publish -> row còn ở trạng thái chưa publish, poller/CDC pick up lại sau khi service restart -> không mất event.
+  - Crash sau khi publish nhưng trước khi mark published -> lần sau publish lại -> Kafka nhận duplicate -> consumer phía sau phải idempotent theo transaction_id (giống kỹ thuật idempotency anh đang dùng cho refund flow) để xử lý an toàn (at-least-once, không phải exactly-once).
+- CDC (Debezium) tốt hơn polling ở chỗ không cần tự quản lý polling interval/lock, và không tạo thêm write amplification lên outbox table.
 
