@@ -72,6 +72,9 @@ public class Appointment {
         this.createdAt = Instant.now();
     }
 
+    public Appointment(String key, String value) {
+    }
+
     public Long getId() {
         return id;
     }

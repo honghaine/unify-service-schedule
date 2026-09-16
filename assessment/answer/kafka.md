@@ -34,3 +34,19 @@
   - Crash sau khi publish nhưng trước khi mark published -> lần sau publish lại -> Kafka nhận duplicate -> consumer phía sau phải idempotent theo transaction_id (giống kỹ thuật idempotency anh đang dùng cho refund flow) để xử lý an toàn (at-least-once, không phải exactly-once).
 - CDC (Debezium) tốt hơn polling ở chỗ không cần tự quản lý polling interval/lock, và không tạo thêm write amplification lên outbox table.
 
+## Phase 3
+1. Delivery semantics
+   - at-most-once: commit before processing
+     - When to use:
+        Non-critical data (metrics, logs)
+        When message loss is acceptable
+        When processing duplicates is more problematic than losing data
+     ![img.png](img.png)
+   - at-least-once: commit after processing, implement the idempotent consumers: uniqueID check, upsert operation, conditional write
+     - When to use:
+        Most production applications
+        When data loss is unacceptable
+        When you can handle duplicate processing
+     ![img_1.png](img_1.png)
+   - exactly-once: Each message is delivered exactly once
+     - 
